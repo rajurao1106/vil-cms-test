@@ -58,31 +58,40 @@ app.use(express.json());
 
 
 // Routes Registration
-app.use('/api/hero-sliders', heroRoutes);
-app.use('/api/company', companyRoutes);
-app.use('/api/vision-mission', visionRoutes);
-app.use('/api/chairman-message', chairmanRoutes);
-app.use('/api/board-members', boardRoutes);
-app.use('/api/committees', committeeRoutes); 
-app.use('/api/programmes', programmeRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/posts', postRoutes);
-app.use('/api/media', mediaRoutes);
-app.use('/api/reviews', reviewRoutes);
-app.use('/api/footer-links', footerRoutes);
-app.use('/api/contact-info', contactRoutes);
-app.use('/api/addresses', addressRoutes);
-app.use('/api/map-location', mapRoutes);
-app.use('/api/contact-page-settings', contactPageRoutes);
-app.use('/api/map-settings', mapSettingRoutes);
-app.use('/api/jobs', jobRoutes);
-app.use('/api/documents', documentRoutes);
-app.use('/api/about-snippet', aboutSnippetRoutes);
-app.use("/api/auth", authRoutes);
-app.use('/api/stats', statRoutes);
+// app.use('/api/hero-sliders', heroRoutes);
+// app.use('/api/company', companyRoutes);
+// app.use('/api/vision-mission', visionRoutes);
+// app.use('/api/chairman-message', chairmanRoutes);
+// app.use('/api/board-members', boardRoutes);
+// app.use('/api/committees', committeeRoutes); 
+// app.use('/api/programmes', programmeRoutes);
+// app.use('/api/products', productRoutes);
+// app.use('/api/posts', postRoutes);
+// app.use('/api/media', mediaRoutes);
+// app.use('/api/reviews', reviewRoutes);
+// app.use('/api/footer-links', footerRoutes);
+// app.use('/api/contact-info', contactRoutes);
+// app.use('/api/addresses', addressRoutes);
+// app.use('/api/map-location', mapRoutes);
+// app.use('/api/contact-page-settings', contactPageRoutes);
+// app.use('/api/map-settings', mapSettingRoutes);
+// app.use('/api/jobs', jobRoutes);
+// app.use('/api/documents', documentRoutes);
+// app.use('/api/about-snippet', aboutSnippetRoutes);
+// app.use("/api/auth", authRoutes);
+// app.use('/api/stats', statRoutes);
 
 app.get("/", (req, res) => {
   res.send("API running perfectly in Next.js environment...");
 });
 
-app.listen(1337, ()=>console.log("api is running..."))
+// Local Development Server
+if (process.env.NODE_ENV !== "production") {
+  const PORT = process.env.PORT || 1337;
+  app.listen(PORT, () => {
+    console.log(`🚀 Local Server running on port ${PORT}`);
+  });
+}
+
+// Export the app for Vercel/Next.js
+export default app;
