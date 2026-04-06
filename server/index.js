@@ -1,9 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import mongoose from 'mongoose';
+
 
 // Database Connection Logic (Optimized for Serverless)
 import connectDB from './config/db.js';
@@ -35,8 +33,6 @@ import authRoutes from "./routes/authRoutes.js";
 dotenv.config();
 
 const app = express();
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // --- SERVERLESS DB CONNECTION MIDDLEWARE ---
 // Yeh ensure karega ki har request se pehle DB connect ho aur connection reuse ho
@@ -60,8 +56,6 @@ app.use(async (req, res, next) => {
 app.use(cors());
 app.use(express.json());
 
-// Static Folders (Note: Vercel par 'uploads' folder read-only hota hai)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes Registration
 app.use('/api/hero-sliders', heroRoutes);
