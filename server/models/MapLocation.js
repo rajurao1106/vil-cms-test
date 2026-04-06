@@ -13,5 +13,6 @@ const mapLocationSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
-const MapLocation = mongoose.model('MapLocation', mapLocationSchema);
+const MapLocation = mongoose.models.MapLocation || mongoose.model('MapLocation', mapLocationSchema);
+
 export default MapLocation;

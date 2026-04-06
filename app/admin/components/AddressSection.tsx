@@ -1,5 +1,7 @@
 "use client";
+import api from "@/lib/api"; // Yeh aapka Axios Instance hai
 import React, { useState, useEffect } from "react";
+import { toast } from "react-toastify";
 
 export default function AddressSection() {
   const [address, setAddress] = useState({
@@ -7,20 +9,23 @@ export default function AddressSection() {
     cityOffice: "",
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // --- READ ---
+  // --- READ (Using Axios) ---
   const fetchAddress = async () => {
     try {
       setIsLoading(true);
-      const res = await fetch("https://vil-cms.vercel.app/api/addresses/save");
-      const data = await res.json();
-      // Ensure we have fallback strings to avoid uncontrolled input errors
+      // Axios automatically JSON parse kar leta hai aur baseURL handle karta hai
+      const res = await api.get("/addresses/save");
+      const data = res.data;
+      
       setAddress({
         headOffice: data?.headOffice || "",
         cityOffice: data?.cityOffice || "",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to fetch:", error);
+      // Error interceptor handles the toast, but safety check:
     } finally {
       setIsLoading(false);
     }
@@ -30,59 +35,57 @@ export default function AddressSection() {
     fetchAddress();
   }, []);
 
-  // Handle input changes (Update local state)
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setAddress((prev) => ({ ...prev, [name]: value }));
   };
 
-  // --- CREATE / UPDATE ---
+  // --- CREATE / UPDATE (Using Axios) ---
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
-      const res = await fetch("https://vil-cms.vercel.app/api/addresses/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(address),
-      });
-
-      if (res.ok) {
-        alert("Address Saved successfully!");
-      }
+      setIsSaving(true);
+      // No backticks needed, just the endpoint
+      await api.post("/addresses/save", address);
+      toast.success("Address Saved successfully!");
     } catch (error) {
-      alert("Error saving address");
+      console.error("Error saving address:", error);
+      // Interceptor will show the error toast
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  // --- DELETE (Clear) ---
+  // --- DELETE / CLEAR ---
   const handleDelete = async () => {
     if (!confirm("Are you sure you want to clear these addresses?")) return;
 
     try {
-      // Assuming your backend supports DELETE or a POST with empty values
-      await fetch("https://vil-cms.vercel.app/api/addresses/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ headOffice: "", cityOffice: "" }),
-      });
+      await api.post("/addresses/save", { headOffice: "", cityOffice: "" });
       setAddress({ headOffice: "", cityOffice: "" });
-      alert("Addresses Cleared!");
+      toast.info("Addresses Cleared!");
     } catch (error) {
-      alert("Failed to delete.");
+      console.error("Failed to delete.");
     }
   };
 
-  if (isLoading) return <p className="p-8">Loading addresses...</p>;
+  if (isLoading) return (
+    <div className="p-8 flex items-center gap-3">
+      <div className="animate-spin h-5 w-5 border-2 border-teal-500 border-t-transparent rounded-full"></div>
+      <p>Loading addresses...</p>
+    </div>
+  );
 
   return (
-    <div className="max-w-2xl p-4">
-      <h2 className="text-3xl font-bold mb-8">Addresses & Sister Concerns</h2>
+    <div className="max-w-2xl p-4 animate-in fade-in duration-500">
+      <h2 className="text-3xl font-bold mb-8 text-gray-800">Addresses & Sister Concerns</h2>
+      
       <form
         onSubmit={handleSave}
-        className="bg-white rounded-3xl p-8 shadow space-y-6"
+        className="bg-white rounded-[2rem] p-8 shadow-sm border border-gray-100 space-y-6"
       >
         <div>
-          <label className="block mb-2 text-sm font-medium text-gray-700">
+          <label className="block mb-2 text-sm font-semibold text-gray-600">
             Head Office
           </label>
           <textarea
@@ -90,12 +93,12 @@ export default function AddressSection() {
             value={address.headOffice}
             onChange={handleChange}
             placeholder="Enter Head Office Address"
-            className="w-full border rounded-3xl p-4 h-28 focus:ring-2 focus:ring-teal-500 outline-none transition-all"
+            className="w-full border border-gray-200 rounded-3xl p-5 h-32 focus:ring-2 focus:ring-teal-500 outline-none transition-all resize-none"
           />
         </div>
 
         <div>
-          <label className="block mb-2 text-sm font-medium text-gray-700">
+          <label className="block mb-2 text-sm font-semibold text-gray-600">
             City Office
           </label>
           <textarea
@@ -103,22 +106,24 @@ export default function AddressSection() {
             value={address.cityOffice}
             onChange={handleChange}
             placeholder="Enter City Office Address"
-            className="w-full border rounded-3xl p-4 h-28 focus:ring-2 focus:ring-teal-500 outline-none transition-all"
+            className="w-full border border-gray-200 rounded-3xl p-5 h-32 focus:ring-2 focus:ring-teal-500 outline-none transition-all resize-none"
           />
         </div>
 
-        <div className="flex gap-4">
+        <div className="flex gap-4 pt-2">
           <button
             type="submit"
-            className="flex-1 bg-teal-600 hover:bg-teal-700 text-white py-4 rounded-3xl font-semibold transition-colors"
+            disabled={isSaving}
+            className={`flex-1 py-4 rounded-3xl font-bold transition-all shadow-lg shadow-teal-100
+              ${isSaving ? 'bg-gray-400' : 'bg-teal-600 hover:bg-teal-700 text-white active:scale-95'}`}
           >
-            Save Addresses
+            {isSaving ? "Saving..." : "Save Addresses"}
           </button>
 
           <button
             type="button"
             onClick={handleDelete}
-            className="px-6 bg-red-50 hover:bg-red-100 text-red-600 py-4 rounded-3xl font-semibold transition-colors border border-red-200"
+            className="px-8 bg-red-50 hover:bg-red-100 text-red-600 py-4 rounded-3xl font-bold transition-all border border-red-100 active:scale-95"
           >
             Clear
           </button>

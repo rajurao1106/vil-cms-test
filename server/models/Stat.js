@@ -10,5 +10,6 @@ const statSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-const Stat = mongoose.model("Stat", statSchema);
+const Stat = mongoose.models.Stat || mongoose.model("Stat", statSchema);
+
 export default Stat;

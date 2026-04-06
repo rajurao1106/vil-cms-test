@@ -16,5 +16,6 @@ const committeeSchema = new mongoose.Schema({
     }]
 }, { timestamps: true });
 
-const Committee = mongoose.model('Committee', committeeSchema);
+const Committee = mongoose.models.Committee || mongoose.model('Committee', committeeSchema);
+
 export default Committee;

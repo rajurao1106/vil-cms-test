@@ -6,5 +6,6 @@ const mapSettingSchema = new mongoose.Schema({
     title: { type: String, trim: true }
 }, { timestamps: true });
 
-const MapSetting = mongoose.model('MapSetting', mapSettingSchema);
+const MapSetting = mongoose.models.MapSetting || mongoose.model('MapSetting', mapSettingSchema);
+
 export default MapSetting;

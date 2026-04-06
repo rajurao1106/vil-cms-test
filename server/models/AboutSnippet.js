@@ -19,5 +19,6 @@ const aboutSnippetSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-const AboutSnippet = mongoose.model("AboutSnippet", aboutSnippetSchema);
+const AboutSnippet = mongoose.models.AboutSnippet || mongoose.model("AboutSnippet", aboutSnippetSchema);
+
 export default AboutSnippet;

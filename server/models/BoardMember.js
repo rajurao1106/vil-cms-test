@@ -29,5 +29,6 @@ const boardMemberSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
-const BoardMember = mongoose.model('BoardMember', boardMemberSchema);
+const BoardMember = mongoose.models.BoardMember || mongoose.model('BoardMember', boardMemberSchema);
+
 export default BoardMember;

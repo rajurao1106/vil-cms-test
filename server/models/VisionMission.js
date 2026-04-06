@@ -20,5 +20,8 @@ const visionMissionSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
-const VisionMission = mongoose.model('VisionMission', visionMissionSchema);
+
+const VisionMission =
+  mongoose.models.VisionMission || mongoose.model("VisionMission", visionMissionSchema);
 export default VisionMission;
+ 

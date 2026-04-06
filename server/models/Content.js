@@ -20,5 +20,6 @@ const contentSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
-const Content = mongoose.model('Content', contentSchema);
+const Content = mongoose.models.Content || mongoose.model('Content', contentSchema);
+
 export default Content;

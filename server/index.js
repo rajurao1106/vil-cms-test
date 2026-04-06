@@ -29,6 +29,8 @@ import documentRoutes from './routes/documentRoutes.js';
 import aboutSnippetRoutes from './routes/aboutSnippetRoutes.js';
 import statRoutes from './routes/statRoutes.js';
 import mapSettingRoutes from './routes/mapSettingRoutes.js';
+import authRoutes from "./routes/authRoutes.js"
+
 dotenv.config();
 connectDB();
 
@@ -74,6 +76,7 @@ app.use('/api/jobs', jobRoutes);
 app.use('/api/documents', documentRoutes);
 
 app.use('/api/about-snippet', aboutSnippetRoutes);
+app.use("/api/auth", authRoutes);
 
 
 // ... existing code ...
@@ -91,5 +94,5 @@ if (process.env.NODE_ENV !== "production") {
     console.log(`🚀 Server running on port ${PORT}`);
   });
 }
-
+ 
 export default app; 

@@ -1,5 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import api from "@/lib/api"; // Aapka Axios instance
+import { toast } from "react-toastify";
 
 interface MediaItem {
   _id?: string;
@@ -10,65 +12,72 @@ interface MediaItem {
 
 export default function MediaSection() {
   const [media, setMedia] = useState<MediaItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-
-  // 1. GET: Fetch existing media
-  const fetchMedia = async () => {
-    try {
-      const res = await fetch("https://vil-cms.vercel.app/api/documents");
-      const data = await res.json();
-      // Ensure data is an array based on your API response structure
-      setMedia(Array.isArray(data) ? data : data.data || []);
-    } catch (error) {
-      console.error("Error fetching media:", error);
-    }
-  };
 
   useEffect(() => {
     fetchMedia();
   }, []);
 
-  // 2. POST: Upload new media
-  const handleFileUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
+  // --- 1. GET: Fetch existing media ---
+  const fetchMedia = async () => {
+    try {
+      setLoading(true);
+      // Axios use karne se baseURL aur Auth headers automatically handle honge
+      const res = await api.get("/media"); 
+      const data = res.data;
+      setMedia(Array.isArray(data) ? data : data.data || []);
+    } catch (error) {
+      console.error("Error fetching media:", error);
+      setMedia([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- 2. POST: Upload new media ---
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files || event.target.files.length === 0) return;
     const file = event.target.files[0];
 
     const formData = new FormData();
     formData.append("file", file);
-    // If your API requires a category or other fields, append them here:
-    // formData.append("category", "General");
+    // Agar category chahiye ho: formData.append("category", "Gallery");
 
     setUploading(true);
-
     try {
-      const res = await fetch("https://vil-cms.vercel.app/api/media/upload", {
-        method: "POST",
-        body: formData, // No headers needed, browser sets Multipart/Form-Data automatically
-      });
-
-      if (res.ok) {
-        alert("Upload successful!");
-        fetchMedia(); // Refresh the gallery
-      } else {
-        alert("Upload failed.");
-      }
-    } catch (error) {
+      // Axios automatically sets 'Content-Type': 'multipart/form-data'
+      await api.post("/media/upload", formData);
+      
+      toast.success("Image uploaded successfully!");
+      fetchMedia(); // Gallery refresh karein
+    } catch (error: any) {
       console.error("Error uploading:", error);
+      toast.error(error.response?.data?.message || "Upload failed.");
     } finally {
       setUploading(false);
+      event.target.value = ""; // Input clear karein
     }
   };
 
   return (
-    <div className="p-6">
+    <div className="p-6 animate-in fade-in duration-500">
       <div className="flex justify-between items-center mb-8">
-        <h2 className="text-3xl font-bold">Media Gallery</h2>
+        <h2 className="text-3xl font-bold text-gray-800">Media Gallery</h2>
 
         {/* Upload Button */}
-        <label className="cursor-pointer bg-blue-600 text-white px-6 py-2 rounded-full hover:bg-blue-700 transition">
-          {uploading ? "Uploading..." : "Upload Image"}
+        <label 
+          className={`cursor-pointer px-6 py-3 rounded-2xl font-bold flex items-center gap-2 transition-all shadow-lg
+          ${uploading ? "bg-gray-400 cursor-not-allowed" : "bg-teal-600 hover:bg-teal-700 text-white shadow-teal-100 active:scale-95"}`}
+        >
+          {uploading ? (
+            <>
+              <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+              Uploading...
+            </>
+          ) : (
+            "+ Upload Image"
+          )}
           <input
             type="file"
             className="hidden"
@@ -80,30 +89,52 @@ export default function MediaSection() {
       </div>
 
       {/* Media Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-        {media.map((item) => (
-          <div
-            key={item._id || item.id}
-            className="bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-xl transition"
-          >
-            <img
-              src={
-                item.filePath.startsWith("http")
-                  ? item.filePath
-                  : `https://vil-cms.vercel.app${item.filePath}`
-              }
-              alt={item.category || "Media"}
-              className="w-full h-48 object-cover"
-            />
-            <div className="p-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
-              {item.category || "Uncategorized"}
-            </div>
-          </div>
-        ))}
-      </div>
+      {loading ? (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map((n) => (
+            <div key={n} className="h-48 bg-gray-100 animate-pulse rounded-3xl"></div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          {media.map((item) => {
+            const key = item._id || item.id || Math.random().toString();
+            // URL logic handle karein
+            const fullUrl = item.filePath.startsWith("http") 
+              ? item.filePath 
+              : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '')}${item.filePath}`;
 
-      {media.length === 0 && !uploading && (
-        <p className="text-center text-gray-400 mt-10">No media found.</p>
+            return (
+              <div
+                key={key}
+                className="group bg-white rounded-[2rem] overflow-hidden shadow-sm border border-gray-100 hover:shadow-xl transition-all duration-300"
+              >
+                <div className="relative h-48 overflow-hidden">
+                  <img
+                    src={fullUrl}
+                    alt={item.category || "Media"}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  />
+                </div>
+                <div className="p-4 flex justify-between items-center">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                    {item.category || "General"}
+                  </span>
+                  {/* Delete button (Optional) */}
+                  <button className="text-red-400 hover:text-red-600 text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                    Delete
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {media.length === 0 && !loading && !uploading && (
+        <div className="text-center py-20 bg-gray-50 rounded-[2.5rem] border-2 border-dashed border-gray-200 mt-10">
+          <p className="text-gray-400 font-medium text-lg">No media found in gallery.</p>
+        </div>
       )}
     </div>
   );

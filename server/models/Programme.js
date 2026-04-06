@@ -20,5 +20,6 @@ const programmeSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
-const Programme = mongoose.model('Programme', programmeSchema);
+const Programme = mongoose.models.Programme || mongoose.model('Programme', programmeSchema);
+
 export default Programme;

@@ -1,6 +1,7 @@
 "use client";
-
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import api from "@/lib/api"; // Aapka Axios instance
+import { toast } from "react-toastify";
 
 // --- Types ---
 interface Stat {
@@ -15,34 +16,34 @@ interface Stat {
 export default function StatsSection() {
   const [stats, setStats] = useState<Stat[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const API_URL = "https://vil-cms.vercel.app/api/stats";
+  const [isSaving, setIsSaving] = useState<boolean>(false);
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
-  const fetchStats = async () => {
-    setLoading(true);
+  // --- GET STATS (Using Axios) ---
+  const fetchStats = useCallback(async () => {
     try {
-      const res = await fetch(API_URL);
-      const data = await res.json();
+      setLoading(true);
+      const res = await api.get("/stats");
+      const data = res.data;
       const normalizedData = Array.isArray(data) ? data : data.data || [];
+      
       setStats(
         normalizedData.length > 0
           ? normalizedData
-          : [{ title: "", value: "", unit: "", order: 0 }],
+          : [{ title: "", value: "", unit: "", order: 0 }]
       );
     } catch (error) {
       console.error("Failed to fetch stats:", error);
+      setStats([{ title: "", value: "", unit: "", order: 0 }]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  /**
-   * Type-safe Change Handler
-   * We split the logic: 'order' expects a number, others expect strings.
-   */
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  // --- CHANGE HANDLER ---
   const handleChange = (index: number, field: keyof Stat, value: string) => {
     setStats((prevStats) => {
       const updatedStats = [...prevStats];
@@ -50,8 +51,9 @@ export default function StatsSection() {
 
       if (field === "order") {
         currentStat.order = Number(value) || 0;
-      } else if (field === "title" || field === "value" || field === "unit") {
-        currentStat[field] = value;
+      } else {
+        // TypeScript safe way to update string fields
+        (currentStat as any)[field] = value;
       }
 
       updatedStats[index] = currentStat;
@@ -60,9 +62,9 @@ export default function StatsSection() {
   };
 
   const addStatRow = () => {
-    setStats([
-      ...stats,
-      { title: "", value: "", unit: "", order: stats.length },
+    setStats((prev) => [
+      ...prev,
+      { title: "", value: "", unit: "", order: prev.length },
     ]);
   };
 
@@ -71,86 +73,63 @@ export default function StatsSection() {
     setStats(
       updatedStats.length > 0
         ? updatedStats
-        : [{ title: "", value: "", unit: "", order: 0 }],
+        : [{ title: "", value: "", unit: "", order: 0 }]
     );
   };
 
+  // --- SAVE ALL (Using Axios) ---
   const handleSave = async () => {
     try {
-      const res = await fetch(`${API_URL}/save-all`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stats }),
-      });
-
-      if (res.ok) {
-        alert("Statistics synchronized successfully!");
-        fetchStats();
-      } else {
-        alert("Failed to save statistics.");
-      }
-    } catch (error) {
+      setIsSaving(true);
+      // Axios directly JSON handle karta hai
+      await api.post("/stats/save-all", { stats });
+      
+      toast.success("📊 Statistics synchronized successfully!");
+      fetchStats();
+    } catch (error: any) {
       console.error("Save error:", error);
+      toast.error(error.response?.data?.message || "Failed to save statistics.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 text-gray-800">
-      <h2 className="text-3xl font-bold mb-8">Manage Statistics</h2>
+    <div className="max-w-4xl mx-auto p-6 text-gray-800 animate-in fade-in duration-500">
+      <h2 className="text-3xl font-bold mb-8 flex items-center gap-2">
+        <span className="w-2 h-8 bg-teal-500 rounded-full"></span>
+        Manage Statistics
+      </h2>
 
-      <div className="bg-white rounded-3xl p-8 shadow-xl border border-gray-100">
+      <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100">
         {loading ? (
-          <div className="py-10 text-center text-gray-400">
-            Loading stats...
+          <div className="py-20 text-center flex flex-col items-center gap-3">
+             <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full"></div>
+             <p className="text-gray-400 font-medium">Loading stats...</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {stats.map((stat, index) => (
-              <div key={index} className="flex items-start gap-3 group">
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 flex-grow">
+              <div key={index} className="flex items-start gap-3 group animate-in slide-in-from-top-2 duration-200">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 flex-grow bg-gray-50/50 p-5 rounded-3xl border border-gray-100">
                   {[
-                    {
-                      label: "Title",
-                      field: "title",
-                      type: "text",
-                      placeholder: "Happy Clients",
-                    },
-                    {
-                      label: "Value",
-                      field: "value",
-                      type: "text",
-                      placeholder: "500",
-                    },
-                    {
-                      label: "Unit",
-                      field: "unit",
-                      type: "text",
-                      placeholder: "+",
-                    },
-                    {
-                      label: "Order",
-                      field: "order",
-                      type: "number",
-                      placeholder: "0",
-                    },
+                    { label: "Title", field: "title", type: "text", placeholder: "e.g. Clients" },
+                    { label: "Value", field: "value", type: "text", placeholder: "500" },
+                    { label: "Unit", field: "unit", type: "text", placeholder: "+" },
+                    { label: "Order", field: "order", type: "number", placeholder: "0" },
                   ].map((input) => (
                     <div key={input.field} className="flex flex-col">
-                      <label className="text-[10px] font-bold uppercase text-gray-400 ml-2 mb-1">
+                      <label className="text-[10px] font-black uppercase text-gray-400 ml-2 mb-1 tracking-widest">
                         {input.label}
                       </label>
                       <input
                         type={input.type}
                         placeholder={input.placeholder}
-                        // Type assertion here is safe because we map field to keys
                         value={stat[input.field as keyof Stat] ?? ""}
                         onChange={(e) =>
-                          handleChange(
-                            index,
-                            input.field as keyof Stat,
-                            e.target.value,
-                          )
+                          handleChange(index, input.field as keyof Stat, e.target.value)
                         }
-                        className="border rounded-2xl px-4 py-3 focus:ring-2 focus:ring-teal-500 outline-none transition-all"
+                        className="border border-gray-200 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-teal-500 outline-none transition-all bg-white"
                       />
                     </div>
                   ))}
@@ -158,20 +137,10 @@ export default function StatsSection() {
 
                 <button
                   onClick={() => removeStatRow(index)}
-                  className="mt-7 p-3 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-2xl transition-all"
+                  className="mt-8 p-3 text-red-300 hover:text-red-600 hover:bg-red-50 rounded-2xl transition-all"
                   title="Remove row"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
                   </svg>
                 </button>
@@ -180,18 +149,20 @@ export default function StatsSection() {
           </div>
         )}
 
-        <div className="flex flex-col sm:flex-row gap-4 mt-8">
+        <div className="flex flex-col sm:flex-row gap-4 mt-10">
           <button
             onClick={addStatRow}
-            className="flex-1 py-4 border-2 border-dashed border-gray-200 text-gray-500 hover:border-teal-500 hover:text-teal-600 rounded-3xl transition-all font-semibold"
+            className="flex-1 py-4 border-2 border-dashed border-gray-200 text-gray-400 hover:border-teal-500 hover:text-teal-600 rounded-3xl transition-all font-bold text-sm"
           >
-            + Add New Stat
+            + Add New Stat Row
           </button>
           <button
             onClick={handleSave}
-            className="flex-1 py-4 bg-teal-600 hover:bg-teal-700 text-white rounded-3xl shadow-lg transition-all font-bold"
+            disabled={isSaving || loading}
+            className={`flex-1 py-4 rounded-3xl shadow-lg transition-all font-bold text-white
+              ${isSaving ? 'bg-gray-400' : 'bg-teal-600 hover:bg-teal-700 shadow-teal-100 active:scale-95'}`}
           >
-            Save All Changes
+            {isSaving ? "Saving..." : "Save All Changes"}
           </button>
         </div>
       </div>

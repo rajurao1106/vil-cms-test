@@ -22,5 +22,6 @@ const footerLinkSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
-const FooterLink = mongoose.model('FooterLink', footerLinkSchema);
+const FooterLink = mongoose.models.FooterLink || mongoose.model('FooterLink', footerLinkSchema);
+
 export default FooterLink;

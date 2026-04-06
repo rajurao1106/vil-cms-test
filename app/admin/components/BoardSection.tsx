@@ -1,5 +1,7 @@
 "use client";
+import api from "@/lib/api"; // Aapka Axios instance
 import React, { useState, useEffect } from "react";
+import { toast } from "react-toastify";
 
 interface Member {
   _id: string;
@@ -11,6 +13,9 @@ interface Member {
 export default function BoardSection() {
   const [members, setMembers] = useState<Member[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const [formData, setFormData] = useState({
     fullName: "",
     designation: "",
@@ -21,138 +26,165 @@ export default function BoardSection() {
     fetchMembers();
   }, []);
 
+  // --- READ (Axios) ---
   const fetchMembers = async () => {
     try {
-      const res = await fetch("https://vil-cms.vercel.app/api/board-members");
-      const data = await res.json();
-      setMembers(data);
+      setIsLoading(true);
+      const res = await api.get("/board-members");
+      // Axios directly data return karta hai
+      setMembers(Array.isArray(res.data) ? res.data : res.data?.data || []);
     } catch (error) {
       console.error("Error fetching members:", error);
+      setMembers([]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleSubmit = async (e: { preventDefault: () => void }) => {
+  // --- CREATE (Axios) ---
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Changed from FormData to JSON
-    await fetch("https://vil-cms.vercel.app/api/board-members/add", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(formData),
-    });
-
-    setShowForm(false);
-    setFormData({ fullName: "", designation: "", profileImageUrl: "" });
-    fetchMembers();
+    try {
+      setIsSubmitting(true);
+      await api.post("/board-members/add", formData);
+      
+      toast.success("Member added successfully!");
+      setShowForm(false);
+      setFormData({ fullName: "", designation: "", profileImageUrl: "" });
+      fetchMembers();
+    } catch (error) {
+      console.error("Add error:", error);
+      // Interceptor will handle the toast message
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
+  // --- DELETE (Axios) ---
   const deleteMember = async (id: string) => {
-    if (!confirm("Delete member?")) return;
-    await fetch(`https://vil-cms.vercel.app/api/board-members/${id}`, {
-      method: "DELETE",
-    });
-    fetchMembers();
+    if (!confirm("Are you sure you want to delete this member?")) return;
+    try {
+      await api.delete(`/board-members/${id}`);
+      toast.success("Member removed!");
+      fetchMembers();
+    } catch (error) {
+      console.error("Delete error:", error);
+    }
   };
 
   return (
-    <div>
-      <div className="flex justify-between mb-8">
-        <h2 className="text-3xl font-bold">Board of Directors</h2>
+    <div className="p-4 animate-in fade-in duration-500">
+      <div className="flex justify-between items-center mb-8">
+        <h2 className="text-3xl font-bold text-gray-800">Board of Directors</h2>
         <button
           onClick={() => setShowForm(true)}
-          className="bg-teal-600 text-white px-6 py-3 rounded-2xl"
+          className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-3 rounded-2xl shadow-lg transition-all active:scale-95"
         >
-          Add Member
+          + Add Member
         </button>
       </div>
 
-      <div className="bg-white rounded-3xl overflow-hidden shadow">
+      <div className="bg-white rounded-[2rem] overflow-hidden shadow-sm border border-gray-100">
         <table className="w-full">
-          <thead className="bg-gray-50">
+          <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
-              <th className="py-4 px-6 text-left">Name</th>
-              <th className="py-4 px-6 text-left">Designation</th>
-              <th className="py-4 px-6 text-left">Image</th>
-              <th className="py-4 px-6 text-left">Actions</th>
+              <th className="py-5 px-6 text-left text-sm font-semibold text-gray-600">Image</th>
+              <th className="py-5 px-6 text-left text-sm font-semibold text-gray-600">Name</th>
+              <th className="py-5 px-6 text-left text-sm font-semibold text-gray-600">Designation</th>
+              <th className="py-5 px-6 text-center text-sm font-semibold text-gray-600">Actions</th>
             </tr>
           </thead>
-          <tbody>
-            {members.map((member) => (
-              <tr key={member._id} className="border-t">
-                <td className="py-4 px-6 font-medium">{member.fullName}</td>
-                <td className="py-4 px-6">{member.designation}</td>
-                <td className="py-4 px-6">
-                  <img
-                    src={member.profileImageUrl}
-                    alt={member.fullName}
-                    className="w-12 h-12 rounded-2xl object-cover"
-                  />
-                </td>
-                <td className="py-4 px-6">
-                  <button
-                    onClick={() => deleteMember(member._id)}
-                    className="text-red-600 hover:underline"
-                  >
-                    Delete
-                  </button>
-                </td>
+          <tbody className="divide-y divide-gray-50">
+            {isLoading ? (
+              <tr>
+                <td colSpan={4} className="py-10 text-center text-gray-400">Loading members...</td>
               </tr>
-            ))}
+            ) : members.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="py-10 text-center text-gray-400">No members found.</td>
+              </tr>
+            ) : (
+              members.map((member) => (
+                <tr key={member._id} className="hover:bg-gray-50/50 transition-colors">
+                  <td className="py-4 px-6">
+                    <img
+                      src={member.profileImageUrl || "https://via.placeholder.com/150"}
+                      alt={member.fullName}
+                      className="w-12 h-12 rounded-2xl object-cover ring-2 ring-gray-100"
+                    />
+                  </td>
+                  <td className="py-4 px-6 font-bold text-gray-800">{member.fullName}</td>
+                  <td className="py-4 px-6 text-gray-600">{member.designation}</td>
+                  <td className="py-4 px-6 text-center">
+                    <button
+                      onClick={() => deleteMember(member._id)}
+                      className="text-red-500 hover:text-red-700 font-medium px-4 py-2 rounded-xl hover:bg-red-50 transition-all"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
 
+      {/* Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-white rounded-3xl p-8 w-full max-w-md">
-            <h3 className="text-xl font-bold mb-6">Add Board Member</h3>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[2rem] p-8 w-full max-w-md shadow-2xl animate-in zoom-in duration-200">
+            <h3 className="text-2xl font-bold mb-6 text-gray-800">Add Board Member</h3>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <input
-                type="text"
-                placeholder="Full Name"
-                value={formData.fullName}
-                onChange={(e) =>
-                  setFormData({ ...formData, fullName: e.target.value })
-                }
-                className="w-full border rounded-2xl px-4 py-3"
-                required
-              />
-              <input
-                type="text"
-                placeholder="Designation"
-                value={formData.designation}
-                onChange={(e) =>
-                  setFormData({ ...formData, designation: e.target.value })
-                }
-                className="w-full border rounded-2xl px-4 py-3"
-                required
-              />
-              {/* Changed from type="file" to type="text" */}
-              <input
-                type="text"
-                placeholder="Profile Image URL"
-                value={formData.profileImageUrl}
-                onChange={(e) =>
-                  setFormData({ ...formData, profileImageUrl: e.target.value })
-                }
-                className="w-full border rounded-2xl px-4 py-3"
-                required
-              />
-              <div className="flex gap-4 mt-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1 ml-1">Full Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. John Doe"
+                  value={formData.fullName}
+                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                  className="w-full border border-gray-200 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-teal-500 outline-none transition-all"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1 ml-1">Designation</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Managing Director"
+                  value={formData.designation}
+                  onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
+                  className="w-full border border-gray-200 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-teal-500 outline-none transition-all"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1 ml-1">Profile Image URL</label>
+                <input
+                  type="text"
+                  placeholder="https://example.com/image.jpg"
+                  value={formData.profileImageUrl}
+                  onChange={(e) => setFormData({ ...formData, profileImageUrl: e.target.value })}
+                  className="w-full border border-gray-200 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-teal-500 outline-none transition-all"
+                  required
+                />
+              </div>
+              
+              <div className="flex gap-4 mt-8">
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="flex-1 py-4 border rounded-3xl"
+                  className="flex-1 py-4 border border-gray-200 rounded-2xl text-gray-600 font-semibold hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-4 bg-teal-600 text-white rounded-3xl"
+                  disabled={isSubmitting}
+                  className={`flex-1 py-4 rounded-2xl font-bold text-white shadow-lg transition-all
+                    ${isSubmitting ? 'bg-gray-400' : 'bg-teal-600 hover:bg-teal-700 shadow-teal-100 active:scale-95'}`}
                 >
-                  Add Member
+                  {isSubmitting ? "Adding..." : "Add Member"}
                 </button>
               </div>
             </form>

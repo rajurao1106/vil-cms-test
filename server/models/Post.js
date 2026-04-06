@@ -12,5 +12,6 @@ const postSchema = new mongoose.Schema({
     tags: [{ type: String }] // Array of strings for "Add tag" feature
 }, { timestamps: true });
 
-const Post = mongoose.model('Post', postSchema);
+const Post = mongoose.models.Post || mongoose.model('Post', postSchema);
+
 export default Post;

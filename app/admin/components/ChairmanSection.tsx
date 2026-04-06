@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
-
-// Import styles
 import "react-quill-new/dist/quill.snow.css";
+import api from "@/lib/api"; // Aapka Axios Client
+import { toast } from "react-toastify";
 
 const ReactQuill = dynamic(() => import("react-quill-new"), {
   ssr: false,
@@ -16,8 +16,8 @@ const ReactQuill = dynamic(() => import("react-quill-new"), {
 });
 
 export default function ChairmanSection() {
-  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Form States
@@ -29,29 +29,18 @@ export default function ChairmanSection() {
     setLoading(true);
     setError(null);
     try {
-      // Note: Ensure this URL matches your backend route exactly
-      const res = await fetch(
-        "https://vil-cms.vercel.app/api/chairman-message",
-      );
+      // Fetch ki jagah api.get use karein
+      const res = await api.get("/chairman-message");
+      const json = res.data;
 
-      if (!res.ok) {
-        throw new Error(`Server responded with status: ${res.status}`);
-      }
-
-      const json = await res.json();
-
-      // Handle Strapi's nested structure or flat JSON
       const attributes = json.data?.attributes || json.data || json;
 
-      setData(attributes);
       setAuthorName(attributes?.authorName || "");
       setContent(attributes?.messageContent || "");
       setSignaturePath(attributes?.signatureImagePath || "");
-    } catch (err: unknown) {
+    } catch (err: any) {
       console.error("Error fetching chairman data:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to connect to the server.",
-      );
+      setError(err.message || "Failed to connect to the server.");
     } finally {
       setLoading(false);
     }
@@ -63,6 +52,7 @@ export default function ChairmanSection() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSaving(true);
 
     const payload = {
       authorName: authorName,
@@ -71,33 +61,22 @@ export default function ChairmanSection() {
     };
 
     try {
-      const res = await fetch(
-        "https://vil-cms.vercel.app/api/chairman-message/save",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        },
-      );
-
-      if (res.ok) {
-        alert("Chairman's Message Saved Successfully!");
-      } else {
-        const errData = await res.json();
-        alert(`Error: ${errData.message || "Save failed"}`);
-      }
-    } catch (error) {
+      // api.post use karein, headers aur stringify ki zaroorat nahi
+      await api.post("/chairman-message/save", payload);
+      toast.success("Chairman's Message Saved Successfully!");
+    } catch (error: any) {
       console.error("Save error:", error);
-      alert("An error occurred while saving. Is the backend running?");
+      // Interceptor error toast handle kar lega, par fallback ke liye alert ya toast:
+      toast.error(error.response?.data?.message || "Failed to save message.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
   if (loading) {
     return (
       <div className="p-8 flex flex-col items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-teal-500 mb-4"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-teal-500 mb-4"></div>
         <p className="text-gray-500 font-medium">Loading Chairman Data...</p>
       </div>
     );
@@ -106,9 +85,7 @@ export default function ChairmanSection() {
   if (error) {
     return (
       <div className="p-8 bg-red-50 rounded-3xl border border-red-100 max-w-3xl">
-        <h3 className="text-red-600 font-bold text-lg mb-2">
-          Connection Error
-        </h3>
+        <h3 className="text-red-600 font-bold text-lg mb-2">Connection Error</h3>
         <p className="text-red-500 mb-4">{error}</p>
         <button
           onClick={fetchData}
@@ -122,9 +99,7 @@ export default function ChairmanSection() {
 
   return (
     <div className="max-w-3xl animate-in fade-in duration-500">
-      <h2 className="text-3xl font-bold mb-8 text-gray-800">
-        Chairman's Message
-      </h2>
+      <h2 className="text-3xl font-bold mb-8 text-gray-800">Chairman's Message</h2>
 
       <form
         onSubmit={handleSave}
@@ -132,23 +107,20 @@ export default function ChairmanSection() {
       >
         {/* Author Name */}
         <div>
-          <label className="block text-sm font-semibold mb-2 text-gray-700">
-            Author Name
-          </label>
+          <label className="block text-sm font-semibold mb-2 text-gray-700">Author Name</label>
           <input
             type="text"
             value={authorName}
             onChange={(e) => setAuthorName(e.target.value)}
             placeholder="e.g. Dr. John Doe"
             className="w-full border border-gray-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all"
+            required
           />
         </div>
 
         {/* Message Content (Rich Text) */}
         <div>
-          <label className="block text-sm font-semibold mb-2 text-gray-700">
-            Message Content
-          </label>
+          <label className="block text-sm font-semibold mb-2 text-gray-700">Message Content</label>
           <div className="min-h-[350px] pb-12">
             <ReactQuill
               theme="snow"
@@ -159,11 +131,9 @@ export default function ChairmanSection() {
           </div>
         </div>
 
-        {/* Signature Path (Text Input) */}
+        {/* Signature Path */}
         <div>
-          <label className="block text-sm font-semibold mb-2 text-gray-700">
-            Signature Image URL / Path
-          </label>
+          <label className="block text-sm font-semibold mb-2 text-gray-700">Signature Image URL / Path</label>
           <input
             type="text"
             value={signaturePath}
@@ -175,9 +145,11 @@ export default function ChairmanSection() {
 
         <button
           type="submit"
-          className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-4 rounded-3xl transition-all duration-200 shadow-lg shadow-teal-100 active:scale-[0.98]"
+          disabled={isSaving}
+          className={`w-full font-bold py-4 rounded-3xl transition-all duration-200 shadow-lg 
+            ${isSaving ? "bg-gray-400 cursor-not-allowed" : "bg-teal-600 hover:bg-teal-700 text-white shadow-teal-100 active:scale-[0.98]"}`}
         >
-          Save Message
+          {isSaving ? "Saving..." : "Save Message"}
         </button>
       </form>
     </div>

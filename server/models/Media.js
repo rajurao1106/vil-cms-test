@@ -12,5 +12,6 @@ const mediaSchema = new mongoose.Schema({
     fileSize: { type: Number }  // Size in bytes
 }, { timestamps: true });
 
-const Media = mongoose.model('Media', mediaSchema);
+const Media = mongoose.models.Media || mongoose.model('Media', mediaSchema);
+
 export default Media;

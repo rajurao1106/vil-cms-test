@@ -8,5 +8,6 @@ const contactInfoSchema = new mongoose.Schema({
     websiteUrl: { type: String, trim: true }
 }, { timestamps: true });
 
-const ContactInfo = mongoose.model('ContactInfo', contactInfoSchema);
+const ContactInfo = mongoose.models.ContactInfo || mongoose.model('ContactInfo', contactInfoSchema);
+
 export default ContactInfo;

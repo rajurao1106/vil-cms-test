@@ -13,5 +13,6 @@ const HeroSliderSchema = new mongoose.Schema(
 );
 
 // CommonJS hata kar ES Module export use karein
-const HeroSlider = mongoose.model("HeroSlider", HeroSliderSchema);
+const HeroSlider = mongoose.models.HeroSlider || mongoose.model("HeroSlider", HeroSliderSchema);
+
 export default HeroSlider;

@@ -2,6 +2,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
 import "react-quill-new/dist/quill.snow.css";
+import axiosClient from "@/lib/api"; // Sahi client import karein
+import { toast } from "react-toastify";
 
 // Import dynamically to disable SSR for the rich text editor
 const ReactQuill = dynamic(() => import("react-quill-new"), {
@@ -20,17 +22,25 @@ interface AboutData {
 export default function AboutSection() {
   const [data, setData] = useState<AboutData>({});
   const [content, setContent] = useState("");
+  const [loading, setLoading] = useState(false);
 
+  // --- FETCH DATA ---
   const fetchData = async () => {
     try {
-      const res = await fetch("https://vil-cms.vercel.app/api/about-snippet");
-      const json = await res.json();
-      if (res.ok) {
-        setData(json || {});
-        setContent(json?.content || "");
-      }
+      setLoading(true);
+      // axiosClient use karein, baseURL handle ho jayega
+      const res = await axiosClient.get("/about-snippet");
+      const json = res.data;
+      
+      // Handle Strapi/Nested structure if needed
+      const attributes = json.data?.attributes || json.data || json;
+      
+      setData(attributes || {});
+      setContent(attributes?.content || "");
     } catch (err) {
-      console.error("Failed to fetch:", err);
+      console.error("Failed to fetch about snippet:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -38,34 +48,23 @@ export default function AboutSection() {
     fetchData();
   }, []);
 
+  // --- SAVE DATA ---
   const handleSave = async () => {
-    // Combine local input state with the rich text editor state
     const payload = {
       ...data,
       content: content,
     };
 
     try {
-      const res = await fetch(
-        "https://vil-cms.vercel.app/api/about-snippet/save",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        },
-      );
-
-      if (res.ok) {
-        alert("About Snippet Saved Successfully!");
-      } else {
-        const errData = await res.json();
-        alert(`Error: ${errData.message}`);
-      }
-    } catch (err) {
+      // `${api}` ki jagah direct endpoint path use karein
+      await axiosClient.post("/about-snippet/save", payload);
+      toast.success("About Snippet Saved Successfully!");
+    } catch (err: any) {
       console.error("Save error:", err);
-      alert("Failed to save. Check console.");
+      // Toast handles generic error via interceptor, but manual fallback:
+      if (err.response?.data?.message) {
+         toast.error(err.response.data.message);
+      }
     }
   };
 
@@ -82,75 +81,76 @@ export default function AboutSection() {
     [],
   );
 
+  if (loading) return <div className="p-10 text-center">Loading About Data...</div>;
+
   return (
-    <div className="max-w-4xl mx-auto p-4">
+    <div className="max-w-4xl mx-auto p-4 animate-in fade-in duration-500">
       <h2 className="text-3xl font-bold mb-8">About Snippet</h2>
-      <div className="bg-white rounded-3xl p-8 shadow-sm border">
-        <label className="block text-sm font-medium text-gray-600 mb-1">
-          Tagline
-        </label>
-        <input
-          type="text"
-          placeholder="Enter tagline..."
-          value={data.tagLine || ""}
-          onChange={(e) => setData({ ...data, tagLine: e.target.value })}
-          className="w-full border rounded-2xl px-4 py-3 mb-6 outline-teal-500"
-        />
+      <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Tagline</label>
+            <input
+              type="text"
+              placeholder="Enter tagline..."
+              value={data.tagLine || ""}
+              onChange={(e) => setData({ ...data, tagLine: e.target.value })}
+              className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-teal-500 transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Heading *</label>
+            <input
+              type="text"
+              placeholder="Enter heading..."
+              value={data.heading || ""}
+              onChange={(e) => setData({ ...data, heading: e.target.value })}
+              className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-teal-500 transition-all"
+              required
+            />
+          </div>
+        </div>
 
-        <label className="block text-sm font-medium text-gray-600 mb-1">
-          Heading *
-        </label>
-        <input
-          type="text"
-          placeholder="Enter heading..."
-          value={data.heading || ""}
-          onChange={(e) => setData({ ...data, heading: e.target.value })}
-          className="w-full border rounded-2xl px-4 py-3 mb-6 outline-teal-500"
-        />
-
-        <div className="mb-20">
-          <label className="block text-sm font-medium text-gray-600 mb-2">
-            Main Content
-          </label>
-          <ReactQuill
-            theme="snow"
-            value={content}
-            onChange={setContent}
-            modules={modules}
-            className="h-64 mb-10"
-          />
+        <div className="mb-24">
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Main Content</label>
+          <div className="h-64">
+             <ReactQuill
+                theme="snow"
+                value={content}
+                onChange={setContent}
+                modules={modules}
+                className="h-full"
+              />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
-              CTA Text
-            </label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">CTA Text</label>
             <input
               type="text"
               placeholder="e.g., Read More"
               value={data.ctaText || ""}
               onChange={(e) => setData({ ...data, ctaText: e.target.value })}
-              className="w-full border rounded-2xl px-4 py-3 outline-teal-500"
+              className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
-              CTA Link
-            </label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">CTA Link</label>
             <input
               type="text"
               placeholder="e.g., /about-us"
               value={data.ctaLink || ""}
               onChange={(e) => setData({ ...data, ctaLink: e.target.value })}
-              className="w-full border rounded-2xl px-4 py-3 outline-teal-500"
+              className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
         </div>
 
         <button
           onClick={handleSave}
-          className="mt-10 w-full bg-teal-600 hover:bg-teal-700 text-white py-4 rounded-3xl text-lg font-bold transition-all"
+          className="mt-10 w-full bg-teal-600 hover:bg-teal-700 text-white py-4 rounded-3xl text-lg font-bold transition-all shadow-lg shadow-teal-100 active:scale-95"
         >
           Save About Snippet
         </button>

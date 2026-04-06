@@ -22,5 +22,6 @@ const chairmanMessageSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
-const ChairmanMessage = mongoose.model('ChairmanMessage', chairmanMessageSchema);
+const ChairmanMessage = mongoose.models.ChairmanMessage || mongoose.model('ChairmanMessage', chairmanMessageSchema);
+
 export default ChairmanMessage;
