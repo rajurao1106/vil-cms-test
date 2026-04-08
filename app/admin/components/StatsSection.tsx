@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import api from "@/lib/api"; // Aapka Axios instance
 import { toast } from "react-toastify";
+import axios from "axios"; // Added for error type guarding
 
 // --- Types ---
 interface Stat {
@@ -31,7 +32,7 @@ export default function StatsSection() {
           ? normalizedData
           : [{ title: "", value: "", unit: "", order: 0 }]
       );
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to fetch stats:", error);
       setStats([{ title: "", value: "", unit: "", order: 0 }]);
     } finally {
@@ -52,8 +53,8 @@ export default function StatsSection() {
       if (field === "order") {
         currentStat.order = Number(value) || 0;
       } else {
-        // TypeScript safe way to update string fields
-        (currentStat as any)[field] = value;
+        // FIX: Use a record type cast instead of unknown to allow dynamic assignment
+        (currentStat as Record<string, string | number | undefined>)[field] = value;
       }
 
       updatedStats[index] = currentStat;
@@ -81,14 +82,22 @@ export default function StatsSection() {
   const handleSave = async () => {
     try {
       setIsSaving(true);
-      // Axios directly JSON handle karta hai
       await api.post("/stats/save-all", { stats });
       
       toast.success("📊 Statistics synchronized successfully!");
       fetchStats();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Save error:", error);
-      toast.error(error.response?.data?.message || "Failed to save statistics.");
+      
+      // FIX: Type-safe error handling for Axios
+      let errorMessage = "Failed to save statistics.";
+      if (axios.isAxiosError(error)) {
+        errorMessage = error.response?.data?.message || error.message;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }

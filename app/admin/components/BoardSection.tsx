@@ -1,196 +1,168 @@
 "use client";
-import api from "@/lib/api"; // Aapka Axios instance
-import React, { useState, useEffect } from "react";
+
+import React, { useState, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
+import "react-quill-new/dist/quill.snow.css";
+import api from "@/lib/api"; // Aapka Axios Client
 import { toast } from "react-toastify";
+import axios from "axios";
 
-interface Member {
-  _id: string;
-  fullName: string;
-  designation: string;
-  profileImageUrl: string;
-}
+const ReactQuill = dynamic(() => import("react-quill-new"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-80 w-full bg-gray-100 animate-pulse rounded-2xl flex items-center justify-center text-gray-400">
+      Loading Editor...
+    </div>
+  ),
+});
 
-export default function BoardSection() {
-  const [members, setMembers] = useState<Member[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const [formData, setFormData] = useState({
-    fullName: "",
-    designation: "",
-    profileImageUrl: "",
-  });
+export default function ChairmanSection() {
+  const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchMembers();
+  // Form States
+  const [content, setContent] = useState("");
+  const [authorName, setAuthorName] = useState("");
+  const [signaturePath, setSignaturePath] = useState("");
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.get("/chairman-message");
+      const json = res.data;
+
+      // Handling different possible Strapi/API response structures
+      const attributes = json.data?.attributes || json.data || json;
+
+      setAuthorName(attributes?.authorName || "");
+      setContent(attributes?.messageContent || "");
+      setSignaturePath(attributes?.signatureImagePath || "");
+    } catch (err: unknown) {
+      console.error("Error fetching chairman data:", err);
+      
+      // Fix: Check if err is an instance of Error to access .message
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Failed to connect to the server.");
+      }
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // --- READ (Axios) ---
-  const fetchMembers = async () => {
-    try {
-      setIsLoading(true);
-      const res = await api.get("/board-members");
-      // Axios directly data return karta hai
-      setMembers(Array.isArray(res.data) ? res.data : res.data?.data || []);
-    } catch (error) {
-      console.error("Error fetching members:", error);
-      setMembers([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-  // --- CREATE (Axios) ---
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSaving(true);
+
+    const payload = {
+      authorName: authorName,
+      messageContent: content,
+      signatureImagePath: signaturePath,
+    };
+
     try {
-      setIsSubmitting(true);
-      await api.post("/board-members/add", formData);
+      await api.post("/chairman-message/save", payload);
+      toast.success("Chairman's Message Saved Successfully!");
+    } catch (err: unknown) {
+      console.error("Save error:", err);
       
-      toast.success("Member added successfully!");
-      setShowForm(false);
-      setFormData({ fullName: "", designation: "", profileImageUrl: "" });
-      fetchMembers();
-    } catch (error) {
-      console.error("Add error:", error);
-      // Interceptor will handle the toast message
+      // Fix: Robust error handling for Axios
+      if (axios.isAxiosError(err)) {
+        toast.error(err.response?.data?.message || "Failed to save message.");
+      } else {
+        toast.error("An unexpected error occurred.");
+      }
     } finally {
-      setIsSubmitting(false);
+      setIsSaving(false);
     }
   };
 
-  // --- DELETE (Axios) ---
-  const deleteMember = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this member?")) return;
-    try {
-      await api.delete(`/board-members/${id}`);
-      toast.success("Member removed!");
-      fetchMembers();
-    } catch (error) {
-      console.error("Delete error:", error);
-    }
-  };
+  if (loading) {
+    return (
+      <div className="p-8 flex flex-col items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-teal-500 mb-4"></div>
+        <p className="text-gray-500 font-medium">Loading Chairman Data...</p>
+      </div>
+    );
+  }
 
-  return (
-    <div className="p-4 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center mb-8">
-        <h2 className="text-3xl font-bold text-gray-800">Board of Directors</h2>
+  if (error) {
+    return (
+      <div className="p-8 bg-red-50 rounded-3xl border border-red-100 max-w-3xl">
+        <h3 className="text-red-600 font-bold text-lg mb-2">Connection Error</h3>
+        <p className="text-red-500 mb-4">{error}</p>
         <button
-          onClick={() => setShowForm(true)}
-          className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-3 rounded-2xl shadow-lg transition-all active:scale-95"
+          onClick={fetchData}
+          className="bg-red-600 text-white px-6 py-2 rounded-xl hover:bg-red-700 transition-colors"
         >
-          + Add Member
+          Try Again
         </button>
       </div>
+    );
+  }
 
-      <div className="bg-white rounded-[2rem] overflow-hidden shadow-sm border border-gray-100">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-100">
-            <tr>
-              <th className="py-5 px-6 text-left text-sm font-semibold text-gray-600">Image</th>
-              <th className="py-5 px-6 text-left text-sm font-semibold text-gray-600">Name</th>
-              <th className="py-5 px-6 text-left text-sm font-semibold text-gray-600">Designation</th>
-              <th className="py-5 px-6 text-center text-sm font-semibold text-gray-600">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {isLoading ? (
-              <tr>
-                <td colSpan={4} className="py-10 text-center text-gray-400">Loading members...</td>
-              </tr>
-            ) : members.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="py-10 text-center text-gray-400">No members found.</td>
-              </tr>
-            ) : (
-              members.map((member) => (
-                <tr key={member._id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="py-4 px-6">
-                    <img
-                      src={member.profileImageUrl || "https://via.placeholder.com/150"}
-                      alt={member.fullName}
-                      className="w-12 h-12 rounded-2xl object-cover ring-2 ring-gray-100"
-                    />
-                  </td>
-                  <td className="py-4 px-6 font-bold text-gray-800">{member.fullName}</td>
-                  <td className="py-4 px-6 text-gray-600">{member.designation}</td>
-                  <td className="py-4 px-6 text-center">
-                    <button
-                      onClick={() => deleteMember(member._id)}
-                      className="text-red-500 hover:text-red-700 font-medium px-4 py-2 rounded-xl hover:bg-red-50 transition-all"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+  return (
+    <div className="max-w-3xl animate-in fade-in duration-500">
+      <h2 className="text-3xl font-bold mb-8 text-gray-800">Chairmans Message</h2>
 
-      {/* Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[2rem] p-8 w-full max-w-md shadow-2xl animate-in zoom-in duration-200">
-            <h3 className="text-2xl font-bold mb-6 text-gray-800">Add Board Member</h3>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 ml-1">Full Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g. John Doe"
-                  value={formData.fullName}
-                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                  className="w-full border border-gray-200 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-teal-500 outline-none transition-all"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 ml-1">Designation</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Managing Director"
-                  value={formData.designation}
-                  onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
-                  className="w-full border border-gray-200 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-teal-500 outline-none transition-all"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 ml-1">Profile Image URL</label>
-                <input
-                  type="text"
-                  placeholder="https://example.com/image.jpg"
-                  value={formData.profileImageUrl}
-                  onChange={(e) => setFormData({ ...formData, profileImageUrl: e.target.value })}
-                  className="w-full border border-gray-200 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-teal-500 outline-none transition-all"
-                  required
-                />
-              </div>
-              
-              <div className="flex gap-4 mt-8">
-                <button
-                  type="button"
-                  onClick={() => setShowForm(false)}
-                  className="flex-1 py-4 border border-gray-200 rounded-2xl text-gray-600 font-semibold hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className={`flex-1 py-4 rounded-2xl font-bold text-white shadow-lg transition-all
-                    ${isSubmitting ? 'bg-gray-400' : 'bg-teal-600 hover:bg-teal-700 shadow-teal-100 active:scale-95'}`}
-                >
-                  {isSubmitting ? "Adding..." : "Add Member"}
-                </button>
-              </div>
-            </form>
+      <form
+        onSubmit={handleSave}
+        className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 space-y-6"
+      >
+        {/* Author Name */}
+        <div>
+          <label className="block text-sm font-semibold mb-2 text-gray-700">Author Name</label>
+          <input
+            type="text"
+            value={authorName}
+            onChange={(e) => setAuthorName(e.target.value)}
+            placeholder="e.g. Dr. John Doe"
+            className="w-full border border-gray-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all"
+            required
+          />
+        </div>
+
+        {/* Message Content (Rich Text) */}
+        <div>
+          <label className="block text-sm font-semibold mb-2 text-gray-700">Message Content</label>
+          <div className="min-h-[350px] pb-12">
+            <ReactQuill
+              theme="snow"
+              value={content}
+              onChange={setContent}
+              className="h-72"
+            />
           </div>
         </div>
-      )}
+
+        {/* Signature Path */}
+        <div>
+          <label className="block text-sm font-semibold mb-2 text-gray-700">Signature Image URL / Path</label>
+          <input
+            type="text"
+            value={signaturePath}
+            onChange={(e) => setSignaturePath(e.target.value)}
+            placeholder="/images/signatures/chairman.png"
+            className="w-full border border-gray-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={isSaving}
+          className={`w-full font-bold py-4 rounded-3xl transition-all duration-200 shadow-lg 
+            ${isSaving ? "bg-gray-400 cursor-not-allowed" : "bg-teal-600 hover:bg-teal-700 text-white shadow-teal-100 active:scale-[0.98]"}`}
+        >
+          {isSaving ? "Saving..." : "Save Message"}
+        </button>
+      </form>
     </div>
   );
 }

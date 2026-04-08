@@ -1,7 +1,8 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
-import api from "@/lib/api"; // Aapka Axios instance
+import api from "@/lib/api"; 
 import { toast } from "react-toastify";
+import axios from "axios";
 
 interface Post {
   _id: string;
@@ -21,9 +22,9 @@ export default function PostsSection() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Form State
-  const [formData, setFormData] = useState({
+  const initialFormState = {
     title: "",
     slug: "",
     type: "News",
@@ -32,17 +33,18 @@ export default function PostsSection() {
     excerpt: "",
     content: "",
     coverImage: "",
-    tags: "", 
-  });
+    tags: "",
+  };
 
-  // --- GET POSTS ---
+  const [formData, setFormData] = useState(initialFormState);
+
   const fetchPosts = useCallback(async () => {
     try {
       setLoading(true);
       const res = await api.get("/posts");
       const data = res.data;
       setPosts(Array.isArray(data) ? data : data.data || []);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Error fetching posts:", err);
       setPosts([]);
     } finally {
@@ -54,26 +56,56 @@ export default function PostsSection() {
     fetchPosts();
   }, [fetchPosts]);
 
-  // --- AUTO SLUG GENERATOR & CHANGE HANDLER ---
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
-    
     if (name === "title") {
-      // Title likhte hi slug auto-generate hoga
       const generatedSlug = value
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/(^-|-$)/g, "");
-      
       setFormData(prev => ({ ...prev, title: value, slug: generatedSlug }));
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
   };
 
-  // --- SUBMIT POST ---
+  // --- DELETE POST ---
+  const handleDelete = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this post?")) return;
+    try {
+      await api.delete(`/posts/${id}`);
+      toast.success("Post deleted successfully");
+      fetchPosts();
+    } catch (err) {
+      toast.error("Failed to delete post");
+    }
+  };
+
+  // --- EDIT MODE ---
+  const handleEdit = (post: Post) => {
+    setEditingId(post._id);
+    setFormData({
+      title: post.title,
+      slug: post.slug,
+      type: post.type,
+      status: post.status,
+      author: post.author || "",
+      excerpt: post.excerpt || "",
+      content: post.content || "",
+      coverImage: post.coverImage || "",
+      tags: post.tags ? post.tags.join(", ") : "",
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const resetForm = () => {
+    setEditingId(null);
+    setFormData(initialFormState);
+  };
+
+  // --- SUBMIT (CREATE OR UPDATE) ---
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -84,25 +116,21 @@ export default function PostsSection() {
     };
 
     try {
-      await api.post("/posts", finalData);
-      toast.success("📰 Post Published Successfully!");
-      
-      // Reset Form
-      setFormData({
-        title: "",
-        slug: "",
-        type: "News",
-        status: "Published",
-        author: "",
-        excerpt: "",
-        content: "",
-        coverImage: "",
-        tags: "",
-      });
+      if (editingId) {
+        await api.put(`/posts/${editingId}`, finalData);
+        toast.success("📰 Post Updated Successfully!");
+      } else {
+        await api.post("/posts", finalData);
+        toast.success("📰 Post Published Successfully!");
+      }
+      resetForm();
       fetchPosts();
-    } catch (err: any) {
-      console.error("Save error:", err);
-      toast.error(err.response?.data?.message || "Error saving post");
+    } catch (err: unknown) {
+      let errorMessage = "Error saving post";
+      if (axios.isAxiosError(err)) {
+        errorMessage = err.response?.data?.message || err.message;
+      }
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -111,54 +139,30 @@ export default function PostsSection() {
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-12 animate-in fade-in duration-500">
       
-      {/* --- ADD POST FORM --- */}
+      {/* --- FORM SECTION --- */}
       <section className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
         <h2 className="text-2xl font-bold mb-8 text-gray-800 flex items-center gap-2">
           <span className="w-2 h-8 bg-orange-500 rounded-full inline-block"></span>
-          Create New Post / News
+          {editingId ? "Edit Post" : "Create New Post"}
         </h2>
         
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-1">
               <label className="text-sm font-semibold text-gray-600 ml-1">Post Title</label>
-              <input
-                name="title"
-                placeholder="e.g. Annual Result 2026"
-                className="w-full p-4 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 transition-all"
-                value={formData.title}
-                onChange={handleChange}
-                required
-              />
+              <input name="title" className="w-full p-4 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500" value={formData.title} onChange={handleChange} required />
             </div>
             <div className="space-y-1">
               <label className="text-sm font-semibold text-gray-600 ml-1">Author Name</label>
-              <input
-                name="author"
-                placeholder="Admin"
-                className="w-full p-4 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 transition-all"
-                value={formData.author}
-                onChange={handleChange}
-              />
+              <input name="author" className="w-full p-4 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500" value={formData.author} onChange={handleChange} />
             </div>
             <div className="space-y-1">
-              <label className="text-sm font-semibold text-gray-600 ml-1">URL Slug (Auto-generated)</label>
-              <input
-                name="slug"
-                placeholder="auto-generated-url"
-                className="w-full p-4 border border-gray-200 rounded-2xl outline-none bg-gray-50 text-gray-500"
-                value={formData.slug}
-                readOnly
-              />
+              <label className="text-sm font-semibold text-gray-600 ml-1">URL Slug</label>
+              <input name="slug" className="w-full p-4 border border-gray-200 rounded-2xl bg-gray-50 text-gray-500" value={formData.slug} readOnly />
             </div>
             <div className="space-y-1">
               <label className="text-sm font-semibold text-gray-600 ml-1">Category Type</label>
-              <select
-                name="type"
-                className="w-full p-4 border border-gray-200 rounded-2xl outline-none bg-white focus:ring-2 focus:ring-orange-500"
-                value={formData.type}
-                onChange={handleChange}
-              >
+              <select name="type" className="w-full p-4 border border-gray-200 rounded-2xl outline-none bg-white focus:ring-2 focus:ring-orange-500" value={formData.type} onChange={handleChange}>
                 <option value="News">News</option>
                 <option value="Blog">Blog</option>
                 <option value="Update">Update</option>
@@ -168,59 +172,46 @@ export default function PostsSection() {
 
           <div className="space-y-1">
             <label className="text-sm font-semibold text-gray-600 ml-1">Cover Image URL</label>
-            <input
-              name="coverImage"
-              placeholder="https://images.unsplash.com/photo..."
-              className="w-full p-4 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500"
-              value={formData.coverImage}
-              onChange={handleChange}
-            />
+            <input name="coverImage" className="w-full p-4 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500" value={formData.coverImage} onChange={handleChange} />
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-semibold text-gray-600 ml-1">Excerpt (Short Summary)</label>
-            <textarea
-              name="excerpt"
-              placeholder="Briefly describe what this post is about..."
-              className="w-full p-4 border border-gray-200 rounded-2xl h-24 outline-none focus:ring-2 focus:ring-orange-500 resize-none"
-              value={formData.excerpt}
-              onChange={handleChange}
-            />
+            <label className="text-sm font-semibold text-gray-600 ml-1">Excerpt</label>
+            <textarea name="excerpt" className="w-full p-4 border border-gray-200 rounded-2xl h-20 outline-none focus:ring-2 focus:ring-orange-500" value={formData.excerpt} onChange={handleChange} />
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-semibold text-gray-600 ml-1">Content (HTML/Text)</label>
-            <textarea
-              name="content"
-              placeholder="Paste your main content here..."
-              className="w-full p-4 border border-gray-200 rounded-2xl h-48 font-mono text-sm outline-none focus:ring-2 focus:ring-orange-500"
-              value={formData.content}
-              onChange={handleChange}
-            />
+            <label className="text-sm font-semibold text-gray-600 ml-1">Content</label>
+            <textarea name="content" className="w-full p-4 border border-gray-200 rounded-2xl h-40 outline-none focus:ring-2 focus:ring-orange-500" value={formData.content} onChange={handleChange} />
           </div>
 
           <div className="space-y-1">
             <label className="text-sm font-semibold text-gray-600 ml-1">Tags (Comma separated)</label>
-            <input
-              name="tags"
-              placeholder="e.g. business, steel, update"
-              className="w-full p-4 border border-gray-200 rounded-2xl outline-none"
-              value={formData.tags}
-              onChange={handleChange}
-            />
+            <input name="tags" className="w-full p-4 border border-gray-200 rounded-2xl outline-none" value={formData.tags} onChange={handleChange} />
           </div>
 
-          <button 
-            disabled={isSubmitting}
-            className={`w-full font-bold py-4 rounded-[2rem] transition-all shadow-lg active:scale-95
-              ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-600 hover:bg-orange-700 text-white shadow-orange-100'}`}
-          >
-            {isSubmitting ? "Publishing..." : "Publish Post"}
-          </button>
+          <div className="flex gap-4">
+            <button 
+              type="submit"
+              disabled={isSubmitting}
+              className={`flex-1 font-bold py-4 rounded-[2rem] transition-all shadow-lg active:scale-95 ${isSubmitting ? 'bg-gray-400' : 'bg-orange-600 hover:bg-orange-700 text-white'}`}
+            >
+              {isSubmitting ? "Processing..." : editingId ? "Update Post" : "Publish Post"}
+            </button>
+            {editingId && (
+              <button 
+                type="button"
+                onClick={resetForm}
+                className="px-8 py-4 bg-gray-100 text-gray-600 font-bold rounded-[2rem] hover:bg-gray-200 transition-all"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
         </form>
       </section>
 
-      {/* --- POSTS DISPLAY --- */}
+      {/* --- DISPLAY SECTION --- */}
       <section>
         <div className="flex justify-between items-end mb-8">
           <h2 className="text-3xl font-bold text-gray-800">Latest Updates</h2>
@@ -234,50 +225,26 @@ export default function PostsSection() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {posts.map((post) => (
-              <div
-                key={post._id}
-                className="group bg-white rounded-[2.5rem] overflow-hidden shadow-sm border border-gray-100 flex flex-col hover:shadow-xl transition-all duration-300"
-              >
+              <div key={post._id} className="group bg-white rounded-[2.5rem] overflow-hidden shadow-sm border border-gray-100 flex flex-col hover:shadow-md transition-all">
                 {post.coverImage && (
-                  <div className="h-52 w-full overflow-hidden">
-                    <img
-                      src={post.coverImage}
-                      alt={post.title}
-                      className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
+                  <div className="h-48 w-full overflow-hidden">
+                    <img src={post.coverImage || "/placeholder.jpg"} alt="" className="h-full w-full object-cover group-hover:scale-105 transition-all" />
                   </div>
                 )}
-                <div className="p-8">
-                  <div className="flex justify-between items-center mb-4">
-                    <span className="bg-orange-50 text-orange-600 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">
-                      {post.type}
-                    </span>
-                    <span className="text-[11px] font-bold text-gray-400">
-                      {new Date(post.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </span>
+                <div className="p-6">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="bg-orange-50 text-orange-600 text-[10px] font-black px-2 py-1 rounded-md uppercase">{post.type}</span>
+                    <div className="flex gap-2">
+                        <button onClick={() => handleEdit(post)} className="text-blue-500 text-xs font-bold hover:underline">Edit</button>
+                        <button onClick={() => handleDelete(post._id)} className="text-red-500 text-xs font-bold hover:underline">Delete</button>
+                    </div>
                   </div>
-                  <h3 className="text-xl font-bold mb-3 text-gray-800 group-hover:text-orange-600 transition-colors">
-                    {post.title}
-                  </h3>
-                  <p className="text-gray-500 text-sm mb-6 line-clamp-2 leading-relaxed">
-                    {post.excerpt}
-                  </p>
-
-                  <div className="flex flex-wrap gap-2 mb-6">
-                    {post.tags?.map((tag, i) => (
-                      <span key={i} className="text-[10px] bg-gray-50 border border-gray-100 px-3 py-1 rounded-full text-gray-400 font-medium">
-                        #{tag}
-                      </span>
-                    ))}
-                  </div>
-
-                  <div className="mt-auto pt-6 border-t border-gray-50 flex justify-between items-center">
-                    <span className="text-xs text-gray-400 font-bold italic">
-                      By {post.author || "Admin"}
-                    </span>
-                    <button className="text-orange-600 text-sm font-bold hover:translate-x-1 transition-transform">
-                      View Details →
-                    </button>
+                  <h3 className="text-lg font-bold mb-2 text-gray-800">{post.title}</h3>
+                  <p className="text-gray-500 text-xs line-clamp-2 mb-4">{post.excerpt}</p>
+                  
+                  <div className="pt-4 border-t border-gray-50 flex justify-between items-center">
+                    <span className="text-[10px] text-gray-400 font-bold">By {post.author || "Admin"}</span>
+                    <span className="text-[10px] text-gray-400">{new Date(post.createdAt).toLocaleDateString()}</span>
                   </div>
                 </div>
               </div>

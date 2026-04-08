@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import api from "@/lib/api"; // Aapka Axios instance
 import { toast } from "react-toastify";
+import axios from "axios"; // Added for type guarding
 
 // --- Types ---
 interface Specification {
@@ -41,7 +42,7 @@ export default function ProductsSection() {
       const res = await api.get("/products");
       const data = res.data;
       setProducts(Array.isArray(data) ? data : data.data || []);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Fetch error:", err);
       setProducts([]);
     } finally {
@@ -60,7 +61,6 @@ export default function ProductsSection() {
     const { name, value } = e.target;
 
     if (name === "productName") {
-      // Auto-generate slug from product name
       const generatedSlug = value
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
@@ -110,9 +110,18 @@ export default function ProductsSection() {
         specifications: [{ label: "", value: "" }],
       });
       fetchProducts();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error adding product:", err);
-      toast.error(err.response?.data?.message || "Failed to save product.");
+      
+      // --- FIX: Type-safe error handling ---
+      let errorMessage = "Failed to save product.";
+      if (axios.isAxiosError(err)) {
+        errorMessage = err.response?.data?.message || err.message;
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }

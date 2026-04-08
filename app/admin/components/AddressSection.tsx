@@ -23,7 +23,7 @@ export default function AddressSection() {
         headOffice: data?.headOffice || "",
         cityOffice: data?.cityOffice || "",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to fetch:", error);
       // Error interceptor handles the toast, but safety check:
     } finally {

@@ -1,6 +1,9 @@
 import Auth from "../models/Users.js"; // Aapka model file
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import dotenv from "dotenv"
+
+dotenv.config()
 
 // REGISTER USER
 export const register = async (req, res) => {

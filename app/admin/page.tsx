@@ -84,6 +84,7 @@ export default function AdminPanel() {
     if (!token) {
       router.push('/'); // Token nahi hai to redirect
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(false); // Token hai to page dikhao
     }
   }, [router]);
@@ -282,7 +283,7 @@ function DashboardOverview() {
           Welcome back, <span className="text-[#43bfb1]">Admin</span>
         </h1>
         <p className="text-gray-500 mt-1 text-sm">
-          Everything is looking good. Here is what's happening with your content today.
+          Everything is looking good. Here is whats happening with your content today.
         </p>
       </div>
       

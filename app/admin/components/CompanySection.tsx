@@ -57,21 +57,40 @@ export default function CompanySection() {
   };
 
   // --- SAVE DATA (Using Axios & FormData) ---
-  const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
+ const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSaving(true);
 
-    const fd = new FormData(e.currentTarget);
+    const formElement = e.currentTarget;
+    const fd = new FormData();
+
+    // Explicitly append fields to ensure they exist
+    const pageTitle = (formElement.elements.namedItem("pageTitle") as HTMLInputElement).value;
+    const subtitle = (formElement.elements.namedItem("subtitle") as HTMLInputElement).value;
+    const fileInput = formElement.elements.namedItem("sectionImage") as HTMLInputElement;
+
     fd.append("category", selectedCategory);
-    fd.append("mainContent", content);
+    fd.append("pageTitle", pageTitle || "");
+    fd.append("subtitle", subtitle || "");
+    fd.append("mainContent", content); // Rich text state
+
+    // Only append image if a file was actually selected
+    if (fileInput?.files?.[0]) {
+      fd.append("sectionImage", fileInput.files[0]);
+    }
 
     try {
-      // Axios ke saath FormData bhejte waqt headers khud set ho jate hain
-      await api.post("/company/save", fd);
+      await api.post("/company/save", fd, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
       toast.success(`${selectedCategory} Saved Successfully!`);
-    } catch (err) {
-      console.error("Save error:", err);
-      toast.error("Failed to save data.");
+    } catch (err: any) {
+      // Check if backend sent a specific error message
+      const errorMsg = err.response?.data?.message || "Failed to save data.";
+      console.error("Save error details:", err.response?.data);
+      toast.error(errorMsg);
     } finally {
       setIsSaving(false);
     }

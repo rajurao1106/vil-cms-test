@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import api from "@/lib/api"; // Aapka Axios instance
 import { toast } from "react-toastify";
+import axios from "axios"; // Import axios for type checking
 
 interface Document {
   _id: string;
@@ -19,14 +20,13 @@ export default function DocumentsSection() {
     fetchDocs();
   }, []);
 
-  // --- GET DOCUMENTS (Using Axios) ---
+  // --- GET DOCUMENTS ---
   const fetchDocs = async () => {
     try {
       setLoading(true);
       const res = await api.get("/documents");
-      // Axios directly returns the data
       setDocs(Array.isArray(res.data) ? res.data : res.data?.data || []);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error fetching documents:", error);
       setDocs([]);
     } finally {
@@ -34,27 +34,35 @@ export default function DocumentsSection() {
     }
   };
 
-  // --- UPLOAD DOCUMENT (Using Axios FormData) ---
+  // --- UPLOAD DOCUMENT ---
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const formData = new FormData();
     formData.append("file", file);
-    // Agar title chahiye toh filename bhej sakte hain
     formData.append("documentTitle", file.name.split(".")[0]);
 
     setUploading(true);
 
     try {
-      // Axios automatically headers (multipart/form-data) set kar leta hai
       await api.post("/documents/upload", formData);
       
       toast.success("Document uploaded successfully!");
       fetchDocs(); // Refresh list
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Upload error:", error);
-      toast.error(error.response?.data?.message || "Upload failed.");
+      
+      // Fix: Handle the 'unknown' type correctly for Axios
+      let errorMessage = "Upload failed.";
+      
+      if (axios.isAxiosError(error)) {
+        errorMessage = error.response?.data?.message || error.message;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      toast.error(errorMessage);
     } finally {
       setUploading(false);
       e.target.value = ""; // Clear input

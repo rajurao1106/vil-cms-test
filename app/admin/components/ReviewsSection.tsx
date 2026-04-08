@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import api from "@/lib/api"; // Aapka Axios instance
 import { toast } from "react-toastify";
+import axios from "axios"; // Added for type guarding
 
 // --- Types ---
 interface Review {
@@ -43,7 +44,7 @@ export default function ReviewsSection() {
       // Normalize data (Support for direct array or Strapi data object)
       const reviewsArray = Array.isArray(data) ? data : data.data || [];
       setReviews(reviewsArray);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error fetching reviews:", error);
       setReviews([]);
     } finally {
@@ -67,9 +68,18 @@ export default function ReviewsSection() {
       toast.success("⭐ Review posted successfully!");
       setFormData({ name: "", rating: 5, reviewText: "" }); // Reset form
       fetchReviews(); // Refresh list
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error posting review:", error);
-      toast.error(error.response?.data?.message || "Failed to post review");
+      
+      // --- FIX: Type-safe error handling ---
+      let errorMessage = "Failed to post review";
+      if (axios.isAxiosError(error)) {
+        errorMessage = error.response?.data?.message || error.message;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -181,7 +191,7 @@ export default function ReviewsSection() {
                   </div>
                   <span className="text-[10px] text-gray-300 font-bold uppercase tracking-widest">Verified</span>
                 </div>
-                <p className="mt-4 text-gray-600 leading-relaxed text-sm italic">"{text}"</p>
+                <p className="mt-4 text-gray-600 leading-relaxed text-sm italic">{text}</p>
               </div>
             );
           })

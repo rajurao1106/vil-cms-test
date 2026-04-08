@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import api from "@/lib/api"; // Aapka Axios instance
 import { toast } from "react-toastify";
+import axios from "axios"; // Added for type guarding
 
 // --- Types ---
 interface Programme {
@@ -31,10 +32,9 @@ export default function ProgrammesSection() {
       setLoading(true);
       const res = await api.get("/programmes");
       const data = res.data;
-      // Axios directly data return karta hai
       const programmesArray = Array.isArray(data) ? data : data.data || [];
       setProgrammes(programmesArray);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Fetch error:", err);
       setProgrammes([]);
     } finally {
@@ -67,10 +67,19 @@ export default function ProgrammesSection() {
         programmeContent: "",
         pdfUrl: "",
       });
-      fetchProgrammes(); // Refresh the list
-    } catch (err: any) {
+      fetchProgrammes(); 
+    } catch (err: unknown) {
       console.error("Save error:", err);
-      toast.error(err.response?.data?.message || "Error adding programme");
+
+      // --- FIX: Type-safe error message extraction ---
+      let errorMessage = "Error adding programme";
+      if (axios.isAxiosError(err)) {
+        errorMessage = err.response?.data?.message || err.message;
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }

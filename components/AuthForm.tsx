@@ -20,7 +20,7 @@ export default function AuthForm({ type }: AuthFormProps) {
     const endpoint = type === "login" ? "/api/auth/login" : "/api/auth/register";
 
     try {
-      const res = await fetch(`http://localhost:1337${endpoint}`, {
+      const res = await fetch(`https://vil-cms-dhct.vercel.app${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
@@ -32,13 +32,18 @@ export default function AuthForm({ type }: AuthFormProps) {
 
       if (type === "login") {
         localStorage.setItem("token", data.token);
-        router.push("/admin"); // Login ke baad redirect
+        router.push("/admin"); 
       } else {
         alert("Registration successful! Now login.");
         router.push("/login");
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      // --- FIX: Type guard for native Error object ---
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("An unexpected error occurred");
+      }
     } finally {
       setLoading(false);
     }

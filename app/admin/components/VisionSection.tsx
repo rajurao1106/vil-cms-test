@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import api from "@/lib/api"; // Aapka Axios instance
 import { toast } from "react-toastify";
+import axios from "axios"; // Added for type guarding
 
 // --- Types ---
 interface VisionMissionData {
@@ -42,7 +43,7 @@ const VisionMissionAdmin: React.FC = () => {
         missionStatement: result.missionStatement || "",
         backgroundImage: result.backgroundImage || "",
       });
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Error fetching data:", err);
     } finally {
       setLoading(false);
@@ -64,9 +65,18 @@ const VisionMissionAdmin: React.FC = () => {
       // Axios directly JSON handle karta hai
       await api.post("/vision-mission/save", formData);
       toast.success("🚀 Vision & Mission updated successfully!");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      toast.error(err.response?.data?.message || "Error updating data");
+
+      // --- FIX: Type-safe error handling ---
+      let errorMessage = "Error updating data";
+      if (axios.isAxiosError(err)) {
+        errorMessage = err.response?.data?.message || err.message;
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }

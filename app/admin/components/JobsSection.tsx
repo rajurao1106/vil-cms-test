@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import api from "@/lib/api"; // Aapka Axios instance
 import { toast } from "react-toastify";
+import axios from "axios"; // Import axios for type guarding
 
 interface Job {
   _id: string;
@@ -37,7 +38,7 @@ export default function JobsSection() {
       const res = await api.get("/jobs");
       const data = res.data;
       setJobs(Array.isArray(data) ? data : data.data || []);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Error fetching jobs:", err);
       setJobs([]);
     } finally {
@@ -83,10 +84,18 @@ export default function JobsSection() {
       });
       
       fetchJobs(); // Refresh List
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error posting job:", err);
-      // Interceptor will show toast, but local fallback:
-      toast.error(err.response?.data?.message || "Failed to post job");
+      
+      // Fix: Type-safe error handling
+      let errorMessage = "Failed to post job";
+      if (axios.isAxiosError(err)) {
+        errorMessage = err.response?.data?.message || err.message;
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -178,6 +187,7 @@ export default function JobsSection() {
           </div>
 
           <button 
+            type="submit"
             disabled={submitting}
             className={`w-full font-bold py-4 rounded-[2rem] transition-all shadow-lg shadow-teal-100 active:scale-95
               ${submitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-teal-600 hover:bg-teal-700 text-white'}`}

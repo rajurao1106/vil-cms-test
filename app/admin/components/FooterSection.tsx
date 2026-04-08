@@ -98,6 +98,6 @@ export default function FooterSection() {
   );
 }
 
-function setDocs(arg0: any) {
+function setDocs(arg0: unknown) {
   throw new Error("Function not implemented.");
 }

@@ -14,8 +14,9 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
       router.replace("/");
     } else {
       // Agar token hai, toh content dikhao
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsAuthorized(true);
-    }
+    } 
   }, [router]);
 
   // Jab tak check ho raha hai, tab tak empty ya loading dikhao

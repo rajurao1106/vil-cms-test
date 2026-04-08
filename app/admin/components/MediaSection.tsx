@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import api from "@/lib/api"; // Aapka Axios instance
 import { toast } from "react-toastify";
+import axios from "axios"; // Import axios for type checking
 
 interface MediaItem {
   _id?: string;
@@ -23,11 +24,10 @@ export default function MediaSection() {
   const fetchMedia = async () => {
     try {
       setLoading(true);
-      // Axios use karne se baseURL aur Auth headers automatically handle honge
       const res = await api.get("/media"); 
       const data = res.data;
       setMedia(Array.isArray(data) ? data : data.data || []);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error fetching media:", error);
       setMedia([]);
     } finally {
@@ -42,18 +42,25 @@ export default function MediaSection() {
 
     const formData = new FormData();
     formData.append("file", file);
-    // Agar category chahiye ho: formData.append("category", "Gallery");
 
     setUploading(true);
     try {
-      // Axios automatically sets 'Content-Type': 'multipart/form-data'
       await api.post("/media/upload", formData);
       
       toast.success("Image uploaded successfully!");
       fetchMedia(); // Gallery refresh karein
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error uploading:", error);
-      toast.error(error.response?.data?.message || "Upload failed.");
+      
+      // Fix: Type-safe error handling for Axios
+      let errorMessage = "Upload failed.";
+      if (axios.isAxiosError(error)) {
+        errorMessage = error.response?.data?.message || error.message;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setUploading(false);
       event.target.value = ""; // Input clear karein
@@ -65,7 +72,6 @@ export default function MediaSection() {
       <div className="flex justify-between items-center mb-8">
         <h2 className="text-3xl font-bold text-gray-800">Media Gallery</h2>
 
-        {/* Upload Button */}
         <label 
           className={`cursor-pointer px-6 py-3 rounded-2xl font-bold flex items-center gap-2 transition-all shadow-lg
           ${uploading ? "bg-gray-400 cursor-not-allowed" : "bg-teal-600 hover:bg-teal-700 text-white shadow-teal-100 active:scale-95"}`}
@@ -88,7 +94,6 @@ export default function MediaSection() {
         </label>
       </div>
 
-      {/* Media Grid */}
       {loading ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           {[1, 2, 3, 4].map((n) => (
@@ -99,10 +104,12 @@ export default function MediaSection() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           {media.map((item) => {
             const key = item._id || item.id || Math.random().toString();
-            // URL logic handle karein
+            
+            // Safe URL Logic
+            const baseUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || '';
             const fullUrl = item.filePath.startsWith("http") 
               ? item.filePath 
-              : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '')}${item.filePath}`;
+              : `${baseUrl}${item.filePath}`;
 
             return (
               <div
@@ -120,7 +127,6 @@ export default function MediaSection() {
                   <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                     {item.category || "General"}
                   </span>
-                  {/* Delete button (Optional) */}
                   <button className="text-red-400 hover:text-red-600 text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity">
                     Delete
                   </button>
