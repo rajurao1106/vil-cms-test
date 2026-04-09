@@ -1,201 +1,191 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
-import api from "@/lib/api"; // Aapka Axios instance
+import api from "@/lib/api"; 
 import { toast } from "react-toastify";
-import axios from "axios"; // Added for type guarding
+import axios from "axios";
 
-// --- Types ---
 interface Review {
-  id?: string | number;
-  _id?: string;
+  _id: string;
   name: string;
   rating: number;
   reviewText: string;
-  attributes?: {
-    name: string;
-    rating: number;
-    reviewText: string;
-  };
-}
-
-interface ReviewFormData {
-  name: string;
-  rating: number;
-  reviewText: string;
+  isApproved: boolean;
+  heading?: string;
 }
 
 export default function ReviewsSection() {
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [formData, setFormData] = useState<ReviewFormData>({
+  const [loading, setLoading] = useState<boolean>(true);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const initialForm = {
     name: "",
     rating: 5,
     reviewText: "",
-  });
-  const [loading, setLoading] = useState<boolean>(true);
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+    heading: "",
+  };
 
-  // --- GET REVIEWS (Using Axios) ---
+  const [formData, setFormData] = useState(initialForm);
+
   const fetchReviews = useCallback(async () => {
     try {
       setLoading(true);
       const res = await api.get("/reviews");
-      const data = res.data;
-
-      // Normalize data (Support for direct array or Strapi data object)
-      const reviewsArray = Array.isArray(data) ? data : data.data || [];
-      setReviews(reviewsArray);
-    } catch (error: unknown) {
-      console.error("Error fetching reviews:", error);
-      setReviews([]);
+      setReviews(Array.isArray(res.data) ? res.data : res.data.data || []);
+    } catch (error) {
+      console.error("Fetch error:", error);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchReviews();
-  }, [fetchReviews]);
+  useEffect(() => { fetchReviews(); }, [fetchReviews]);
 
-  // --- POST REVIEW (Using Axios) ---
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  // --- DELETE ---
+  const handleDelete = async (id: string) => {
+    if (!window.confirm("Delete this review permanently?")) return;
+    try {
+      await api.delete(`/reviews/${id}`);
+      toast.success("Review deleted");
+      fetchReviews();
+    } catch (err) {
+      toast.error("Delete failed");
+    }
+  };
+
+  // --- TOGGLE APPROVAL ---
+  const toggleApproval = async (review: Review) => {
+    try {
+      await api.put(`/reviews/${review._id}`, { isApproved: !review.isApproved });
+      toast.info(review.isApproved ? "Review Unapproved" : "Review Approved");
+      fetchReviews();
+    } catch (err) {
+      toast.error("Status update failed");
+    }
+  };
+
+  // --- EDIT MODE ---
+  const startEdit = (review: Review) => {
+    setEditingId(review._id);
+    setFormData({
+      name: review.name,
+      rating: review.rating,
+      reviewText: review.reviewText,
+      heading: review.heading || "",
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-
     try {
-      // Tip: Agar Strapi use kar rahe hain toh payload: { data: formData } bhejien
-      await api.post("/reviews", formData);
-      
-      toast.success("⭐ Review posted successfully!");
-      setFormData({ name: "", rating: 5, reviewText: "" }); // Reset form
-      fetchReviews(); // Refresh list
-    } catch (error: unknown) {
-      console.error("Error posting review:", error);
-      
-      // --- FIX: Type-safe error handling ---
-      let errorMessage = "Failed to post review";
-      if (axios.isAxiosError(error)) {
-        errorMessage = error.response?.data?.message || error.message;
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
+      if (editingId) {
+        await api.put(`/reviews/${editingId}`, formData);
+        toast.success("Review updated!");
+      } else {
+        await api.post("/reviews", formData);
+        toast.success("Review added!");
       }
-      
-      toast.error(errorMessage);
+      setFormData(initialForm);
+      setEditingId(null);
+      fetchReviews();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Error saving review");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-4 space-y-8 animate-in fade-in duration-500">
-      <h2 className="text-3xl font-bold mb-8 text-gray-900 flex items-center gap-3">
-        <span className="w-2 h-8 bg-blue-600 rounded-full"></span>
-        Reviews & Testimonials
-      </h2>
+    <div className="max-w-4xl mx-auto p-6 space-y-10 animate-in fade-in duration-500">
+      <div className="flex justify-between items-center">
+        <h2 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+          <span className="w-2 h-8 bg-blue-600 rounded-full"></span>
+          Review Management
+        </h2>
+      </div>
 
-      {/* --- POST REVIEW FORM --- */}
-      <form
-        onSubmit={handleSubmit}
-        className="mb-12 bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm"
-      >
-        <h3 className="text-xl font-bold mb-6 text-gray-800">Leave a Review</h3>
-        <div className="space-y-5">
-          <div className="space-y-1">
-            <label className="text-sm font-semibold text-gray-600 ml-1">Full Name</label>
-            <input
-              type="text"
-              placeholder="e.g. John Doe"
-              className="w-full p-4 rounded-2xl border border-gray-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all bg-gray-50/50"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-sm font-semibold text-gray-600 ml-1">Rating</label>
-            <div className="relative">
-              <select
-                className="w-full p-4 rounded-2xl border border-gray-200 outline-none bg-gray-50/50 focus:ring-2 focus:ring-blue-500 transition-all appearance-none font-medium text-gray-700"
-                value={formData.rating}
-                onChange={(e) =>
-                  setFormData({ ...formData, rating: Number(e.target.value) })
-                }
-              >
-                {[5, 4, 3, 2, 1].map((num) => (
-                  <option key={num} value={num}>
-                    {num} Star{num !== 1 ? "s" : ""}
-                  </option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
-                ▼
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-sm font-semibold text-gray-600 ml-1">Review Text</label>
-            <textarea
-              placeholder="Tell us about your experience..."
-              className="w-full p-4 rounded-2xl border border-gray-200 outline-none h-32 focus:ring-2 focus:ring-blue-500 transition-all bg-gray-50/50 resize-none"
-              value={formData.reviewText}
-              onChange={(e) =>
-                setFormData({ ...formData, reviewText: e.target.value })
-              }
-              required
-            />
-          </div>
-
+      {/* --- FORM --- */}
+      <form onSubmit={handleSubmit} className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm">
+        <h3 className="text-xl font-bold mb-6">{editingId ? "Edit Review" : "Add Manual Review"}</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+          <input
+            placeholder="Name"
+            className="p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            required
+          />
+          <select
+            className="p-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none"
+            value={formData.rating}
+            onChange={(e) => setFormData({ ...formData, rating: Number(e.target.value) })}
+          >
+            {[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>{n} Stars</option>)}
+          </select>
+        </div>
+        <textarea
+          placeholder="Review Text..."
+          className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 h-32 mb-5 outline-none focus:ring-2 focus:ring-blue-500"
+          value={formData.reviewText}
+          onChange={(e) => setFormData({ ...formData, reviewText: e.target.value })}
+          required
+        />
+        <div className="flex gap-3">
           <button
             type="submit"
             disabled={isSubmitting}
-            className={`w-full sm:w-auto px-10 py-4 rounded-2xl font-bold transition-all shadow-lg active:scale-95
-              ${isSubmitting ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-100'}`}
+            className={`px-8 py-4 rounded-2xl font-bold text-white transition-all ${editingId ? 'bg-orange-500' : 'bg-blue-600'}`}
           >
-            {isSubmitting ? "Posting..." : "Post Review"}
+            {isSubmitting ? "Processing..." : editingId ? "Update Review" : "Post Review"}
           </button>
+          {editingId && (
+            <button type="button" onClick={() => { setEditingId(null); setFormData(initialForm); }} className="px-8 py-4 bg-gray-100 rounded-2xl font-bold">Cancel</button>
+          )}
         </div>
       </form>
 
-      {/* --- REVIEWS LIST --- */}
-      <div className="space-y-5">
+      {/* --- LIST --- */}
+      <div className="grid grid-cols-1 gap-4">
         {loading ? (
-          <div className="text-center py-10 flex flex-col items-center gap-2">
-            <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-            <p className="text-gray-400 text-sm font-medium">Fetching testimonials...</p>
-          </div>
-        ) : reviews.length === 0 ? (
-          <div className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-[2rem] py-16 text-center text-gray-400">
-             No reviews yet. Be the first to leave one!
-          </div>
-        ) : (
-          reviews.map((review) => {
-            const name = review.name || review.attributes?.name;
-            const rating = review.rating || review.attributes?.rating || 0;
-            const text = review.reviewText || review.attributes?.reviewText;
-
-            return (
-              <div
-                key={review._id || review.id}
-                className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 group"
-              >
-                <div className="flex justify-between items-start">
-                  <div className="space-y-1">
-                    <p className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{name}</p>
-                    <div className="flex text-yellow-400 text-sm">
-                      {"★".repeat(rating)}
-                      <span className="text-gray-200">
-                        {"★".repeat(5 - rating)}
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-[10px] text-gray-300 font-bold uppercase tracking-widest">Verified</span>
-                </div>
-                <p className="mt-4 text-gray-600 leading-relaxed text-sm italic">{text}</p>
+          <div className="text-center py-10">Loading reviews...</div>
+        ) : reviews.map((review) => (
+          <div key={review._id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-bold text-gray-800">{review.name}</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${review.isApproved ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'}`}>
+                  {review.isApproved ? "Approved" : "Pending"}
+                </span>
               </div>
-            );
-          })
-        )}
+              <div className="flex text-yellow-400 text-xs mb-2">{"★".repeat(review.rating)}</div>
+              <p className="text-gray-500 text-sm italic">"{review.reviewText}"</p>
+            </div>
+
+            <div className="flex gap-2 w-full md:w-auto">
+              <button 
+                onClick={() => toggleApproval(review)} 
+                className={`flex-1 md:flex-none px-4 py-2 rounded-xl text-xs font-bold transition-all ${review.isApproved ? 'bg-gray-100 text-gray-600' : 'bg-green-600 text-white'}`}
+              >
+                {review.isApproved ? "Unapprove" : "Approve"}
+              </button>
+              <button 
+                onClick={() => startEdit(review)} 
+                className="flex-1 md:flex-none px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold"
+              >
+                Edit
+              </button>
+              <button 
+                onClick={() => handleDelete(review._id)} 
+                className="flex-1 md:flex-none px-4 py-2 bg-red-50 text-red-500 rounded-xl text-xs font-bold"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

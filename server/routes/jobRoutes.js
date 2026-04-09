@@ -1,5 +1,6 @@
 import express from 'express';
-import { postJob, getJobs, updateJob } from '../controllers/jobController.js';
+// deleteJob ko controller se import karna na bhoolein
+import { postJob, getJobs, updateJob, deleteJob } from '../controllers/jobController.js';
 
 const router = express.Router();
 
@@ -7,6 +8,9 @@ router.route('/')
     .get(getJobs)
     .post(postJob);
 
-router.put('/:id', updateJob);
+// Is section ko update karein
+router.route('/:id')
+    .put(updateJob)
+    .delete(deleteJob); // <-- Yeh line add karein
 
 export default router;

@@ -12,11 +12,11 @@ const ReactQuill = dynamic(() => import("react-quill-new"), {
 
 const categories = [
   "The Company",
-  "Vision & Mission",
-  "Chairman Message",
-  "Board of Directors",
-  "Committees",
-  "Familiarization",
+  // "Vision & Mission",
+  // "Chairman Message",
+  // "Board of Directors",
+  // "Committees",
+  // "Familiarization",
 ];
 
 interface CompanyData {

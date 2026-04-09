@@ -2,13 +2,13 @@ import mongoose from 'mongoose';
 
 const productSchema = new mongoose.Schema({
     // Basic Info
-    productName: { type: String, required: true, trim: true },
-    urlSlug: { type: String, required: true, unique: true, trim: true },
-    category: { type: String, required: true },
+    productName: { type: String, trim: true },
+    urlSlug: { type: String, unique: true, trim: true },
+    category: { type: String },
     status: { type: String, enum: ['Draft', 'Published'], default: 'Draft' },
     isActive: { type: Boolean, default: true },
     shortDescription: { type: String },
-    fullDescription: { type: String, required: true },
+    fullDescription: { type: String },
 
     // Dynamic Specifications (Array of objects for "Add" button)
     specifications: [{

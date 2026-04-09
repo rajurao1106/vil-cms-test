@@ -1,12 +1,14 @@
 import express from 'express';
-import { createProduct, getProducts, getProductBySlug } from '../controllers/productController.js';
+import { createProduct, getProducts, updateProduct, deleteProduct } from '../controllers/productController.js';
 
 const router = express.Router();
 
 router.route('/')
-    .post(createProduct)
-    .get(getProducts);
+    .get(getProducts)
+    .post(createProduct); // Frontend yahan POST karega
 
-router.get('/:slug', getProductBySlug);
+router.route('/:id')
+    .put(updateProduct)
+    .delete(deleteProduct);
 
 export default router;

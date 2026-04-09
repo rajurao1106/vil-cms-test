@@ -1,10 +1,8 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
-import api from "@/lib/api"; // Aapka Axios instance
+import api from "@/lib/api"; 
 import { toast } from "react-toastify";
-import axios from "axios"; // Added for type guarding
 
-// --- Types ---
 interface Specification {
   label: string;
   value: string;
@@ -17,286 +15,153 @@ interface Product {
   category: string;
   status: "Published" | "Draft";
   shortDescription: string;
+  fullDescription: string; // Required in Backend
   specifications: Specification[];
 }
 
 export default function ProductsSection() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Form State
-  const [formData, setFormData] = useState<Product>({
+  const initialForm = {
     productName: "",
     urlSlug: "",
     category: "",
-    status: "Published",
+    status: "Published" as const,
     shortDescription: "",
+    fullDescription: "Default description", // Placeholder for required field
     specifications: [{ label: "", value: "" }],
-  });
+  };
 
-  // --- GET PRODUCTS ---
+  const [formData, setFormData] = useState<Product>(initialForm);
+
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
       const res = await api.get("/products");
-      const data = res.data;
-      setProducts(Array.isArray(data) ? data : data.data || []);
-    } catch (err: unknown) {
-      console.error("Fetch error:", err);
-      setProducts([]);
+      setProducts(res.data);
+    } catch (err) {
+      toast.error("Failed to load inventory");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
+  useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
-  // Handle Input Changes & Auto-Slug
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-
     if (name === "productName") {
-      const generatedSlug = value
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "");
-      
-      setFormData((prev) => ({ ...prev, productName: value, urlSlug: generatedSlug }));
+      const slug = value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+      setFormData(prev => ({ ...prev, productName: value, urlSlug: slug }));
     } else {
-      setFormData((prev) => ({ ...prev, [name]: value }));
+      setFormData(prev => ({ ...prev, [name]: value }));
     }
   };
 
-  // Dynamic Specs Logic
-  const handleSpecChange = (index: number, field: keyof Specification, value: string) => {
-    const newSpecs = [...formData.specifications];
-    newSpecs[index][field] = value;
-    setFormData((prev) => ({ ...prev, specifications: newSpecs }));
-  };
-
-  const addSpecField = () => {
-    setFormData((prev) => ({
-      ...prev,
-      specifications: [...prev.specifications, { label: "", value: "" }],
-    }));
-  };
-
-  const removeSpecField = (index: number) => {
-    if (formData.specifications.length <= 1) return;
-    const newSpecs = formData.specifications.filter((_, i) => i !== index);
-    setFormData((prev) => ({ ...prev, specifications: newSpecs }));
-  };
-
-  // Submit Form (Axios)
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     try {
-      await api.post("/products/add", formData);
-      toast.success("📦 Product added successfully!");
-      
-      // Reset Form
-      setFormData({
-        productName: "",
-        urlSlug: "",
-        category: "",
-        status: "Published",
-        shortDescription: "",
-        specifications: [{ label: "", value: "" }],
-      });
-      fetchProducts();
-    } catch (err: unknown) {
-      console.error("Error adding product:", err);
-      
-      // --- FIX: Type-safe error handling ---
-      let errorMessage = "Failed to save product.";
-      if (axios.isAxiosError(err)) {
-        errorMessage = err.response?.data?.message || err.message;
-      } else if (err instanceof Error) {
-        errorMessage = err.message;
+      if (editingId) {
+        await api.put(`/products/${editingId}`, formData);
+        toast.success("Product Updated!");
+      } else {
+        // Backend expects POST on /api/products
+        await api.post("/products", formData);
+        toast.success("Product Added!");
       }
-      
-      toast.error(errorMessage);
+      setFormData(initialForm);
+      setEditingId(null);
+      fetchProducts();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Something went wrong");
     } finally {
       setIsSaving(false);
     }
   };
 
+  const handleEdit = (p: Product) => {
+    setEditingId(p._id!);
+    setFormData(p);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Delete this product?")) return;
+    try {
+      await api.delete(`/products/${id}`);
+      toast.success("Deleted");
+      fetchProducts();
+    } catch (err) {
+      toast.error("Delete failed");
+    }
+  };
+
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-10 animate-in fade-in duration-500">
-      {/* --- ADD PRODUCT FORM --- */}
-      <section className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
-        <h2 className="text-2xl font-bold mb-8 text-gray-800 flex items-center gap-2">
-          <span className="w-2 h-8 bg-blue-500 rounded-full inline-block"></span>
-          Add New Product
-        </h2>
-        
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Product Name</label>
-              <input
-                type="text"
-                name="productName"
-                placeholder="e.g. Premium TMT Bar"
-                className="w-full p-4 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                value={formData.productName}
-                onChange={handleChange}
-                required
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-400 uppercase ml-1">URL Slug</label>
-              <input
-                type="text"
-                name="urlSlug"
-                placeholder="auto-generated-slug"
-                className="w-full p-4 border border-gray-200 rounded-2xl outline-none bg-gray-50 text-gray-500"
-                value={formData.urlSlug}
-                readOnly
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Category</label>
-              <input
-                type="text"
-                name="category"
-                placeholder="e.g. Construction Steel"
-                className="w-full p-4 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                value={formData.category}
-                onChange={handleChange}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Status</label>
-              <select
-                name="status"
-                className="w-full p-4 border border-gray-200 rounded-2xl outline-none bg-white focus:ring-2 focus:ring-blue-500"
-                value={formData.status}
-                onChange={handleChange}
-              >
-                <option value="Published">Published</option>
-                <option value="Draft">Draft</option>
-              </select>
-            </div>
+    <div className="max-w-5xl mx-auto p-6 space-y-10">
+      <section className="bg-white p-8 rounded-[2rem] border shadow-sm">
+        <h2 className="text-2xl font-bold mb-6">{editingId ? "Edit Product" : "Add Product"}</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <input name="productName" placeholder="Product Name" className="p-4 border rounded-xl" value={formData.productName} onChange={handleChange} required />
+            <input name="urlSlug" placeholder="Slug" className="p-4 border rounded-xl bg-gray-50" value={formData.urlSlug} readOnly />
+            <input name="category" placeholder="Category" className="p-4 border rounded-xl" value={formData.category} onChange={handleChange} required />
+            <select name="status" className="p-4 border rounded-xl" value={formData.status} onChange={handleChange}>
+              <option value="Published">Published</option>
+              <option value="Draft">Draft</option>
+            </select>
+          </div>
+          <textarea name="shortDescription" placeholder="Description" className="w-full p-4 border rounded-xl" value={formData.shortDescription} onChange={handleChange} />
+          
+          <div className="p-4 bg-gray-50 rounded-xl">
+            <p className="font-bold mb-2">Specs</p>
+            {formData.specifications.map((s, i) => (
+              <div key={i} className="flex gap-2 mb-2">
+                <input placeholder="Label" className="flex-1 p-2 border rounded-lg" value={s.label} onChange={(e) => {
+                  const ns = [...formData.specifications]; ns[i].label = e.target.value; setFormData({...formData, specifications: ns});
+                }} />
+                <input placeholder="Value" className="flex-1 p-2 border rounded-lg" value={s.value} onChange={(e) => {
+                  const ns = [...formData.specifications]; ns[i].value = e.target.value; setFormData({...formData, specifications: ns});
+                }} />
+              </div>
+            ))}
+            <button type="button" onClick={() => setFormData({...formData, specifications: [...formData.specifications, {label: "", value: ""}]})} className="text-blue-600 text-sm">+ Add Spec</button>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-gray-400 uppercase ml-1">Short Description</label>
-            <textarea
-              name="shortDescription"
-              placeholder="Provide a brief overview of the product..."
-              className="w-full p-4 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"
-              rows={3}
-              value={formData.shortDescription}
-              onChange={handleChange}
-            />
-          </div>
-
-          {/* Dynamic Specifications */}
-          <div className="space-y-4 bg-gray-50/50 p-6 rounded-3xl border border-gray-100">
-            <label className="font-bold text-gray-700 flex items-center gap-2">
-              Technical Specifications
-            </label>
-            <div className="space-y-3">
-              {formData.specifications.map((spec, index) => (
-                <div key={index} className="flex gap-3 items-center animate-in slide-in-from-left-2 duration-200">
-                  <input
-                    placeholder="Label (e.g. Grade)"
-                    className="flex-1 p-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500"
-                    value={spec.label}
-                    onChange={(e) => handleSpecChange(index, "label", e.target.value)}
-                  />
-                  <input
-                    placeholder="Value (e.g. Fe 550D)"
-                    className="flex-1 p-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500"
-                    value={spec.value}
-                    onChange={(e) => handleSpecChange(index, "value", e.target.value)}
-                  />
-                  <button 
-                    type="button" 
-                    onClick={() => removeSpecField(index)}
-                    className="text-red-400 hover:text-red-600 p-2"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={addSpecField}
-              className="text-sm text-blue-600 hover:text-blue-700 font-bold flex items-center gap-1"
-            >
-              + Add Specification Field
+          <div className="flex gap-4">
+            <button disabled={isSaving} className="flex-1 bg-blue-600 text-white py-4 rounded-xl font-bold">
+              {isSaving ? "Saving..." : editingId ? "Update Product" : "Save Product"}
             </button>
+            {editingId && <button type="button" onClick={() => {setEditingId(null); setFormData(initialForm);}} className="px-6 bg-gray-200 rounded-xl">Cancel</button>}
           </div>
-
-          <button
-            type="submit"
-            disabled={isSaving}
-            className={`w-full font-bold py-4 rounded-[2rem] transition-all shadow-lg active:scale-95
-              ${isSaving ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-100"}`}
-          >
-            {isSaving ? "Saving Product..." : "Save Product to Inventory"}
-          </button>
         </form>
       </section>
 
-      {/* --- PRODUCTS TABLE --- */}
-      <section>
-        <h2 className="text-2xl font-bold mb-6 text-gray-800">Product Inventory</h2>
-        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
-          <table className="w-full text-left">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="p-5 font-bold text-gray-600 text-sm">Product Details</th>
-                <th className="p-5 font-bold text-gray-600 text-sm">Category</th>
-                <th className="p-5 font-bold text-gray-600 text-sm">Status</th>
+      <section className="bg-white rounded-[2rem] border overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="p-4 text-left">Product</th>
+              <th className="p-4 text-left">Category</th>
+              <th className="p-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map(p => (
+              <tr key={p._id} className="border-t">
+                <td className="p-4 font-bold">{p.productName}</td>
+                <td className="p-4">{p.category}</td>
+                <td className="p-4 text-right space-x-2">
+                  <button onClick={() => handleEdit(p)} className="text-blue-600">Edit</button>
+                  <button onClick={() => handleDelete(p._id!)} className="text-red-600">Delete</button>
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {loading ? (
-                <tr>
-                  <td colSpan={3} className="p-16 text-center">
-                    <div className="flex flex-col items-center gap-2">
-                       <div className="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                       <p className="text-gray-400 text-sm">Loading inventory...</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : products.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="p-16 text-center text-gray-400 font-medium">
-                    No products found in database.
-                  </td>
-                </tr>
-              ) : (
-                products.map((p, idx) => (
-                  <tr key={p._id || idx} className="hover:bg-gray-50/50 transition-colors group">
-                    <td className="p-5">
-                      <div className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{p.productName}</div>
-                      <div className="text-[10px] text-gray-400 font-mono tracking-tighter uppercase">{p.urlSlug}</div>
-                    </td>
-                    <td className="p-5 text-gray-600 font-medium text-sm">{p.category || "General"}</td>
-                    <td className="p-5">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                        p.status === "Published" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
-                      }`}>
-                        {p.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       </section>
     </div>
   );

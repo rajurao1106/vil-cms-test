@@ -79,7 +79,7 @@ app.use("/api/reviews", reviewRoutes);
 // Footer & Global Links
 app.use("/api/footer-links", footerRoutes);
 
-// Contact Page & Location
+// Contact Page & Location 
 app.use("/api/contact-info", contactRoutes);
 app.use("/api/addresses", addressRoutes);
 app.use("/api/map-location", mapRoutes);

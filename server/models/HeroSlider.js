@@ -2,11 +2,11 @@ import mongoose from "mongoose";
 
 const HeroSliderSchema = new mongoose.Schema(
   {
-    heading: { type: String, required: true },
+    heading: { type: String },
     subtitle: { type: String },
-    ctaText: { type: String },
+    ctaText: { type: String }, 
     ctaLink: { type: String },
-    backgroundImagePath: { type: String, required: true },
+    backgroundImagePath: { type: String },
     animation: { type: String, default: "Fade" },
   },
   { timestamps: true },

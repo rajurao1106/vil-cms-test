@@ -21,15 +21,12 @@ export const getCommittees = async (req, res) => {
 };
 
 // @desc    Update a committee
+// Add this to committeeController.js
 export const updateCommittee = async (req, res) => {
     try {
-        const committee = await Committee.findByIdAndUpdate(
-            req.params.id, 
-            req.body, 
-            { new: true }
-        );
-        res.status(200).json(committee);
+        await Committee.findByIdAndDelete(req.params.id);
+        res.status(200).json({ message: "Deleted successfully" });
     } catch (error) {
-        res.status(400).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }
 };

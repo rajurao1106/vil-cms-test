@@ -6,7 +6,7 @@ import {
   deleteContactInfo
 } from "../controllers/contactPageController.js";
 
-const router = express.Router();
+const router = express.Router(); 
 
 router.post("/contact-info/save", saveContactInfo);
 router.get("/contact-info", getContactInfo);

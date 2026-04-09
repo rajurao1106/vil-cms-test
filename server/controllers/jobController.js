@@ -29,3 +29,13 @@ export const updateJob = async (req, res) => {
         res.status(400).json({ message: error.message });
     }
 };
+// controllers/jobController.js
+export const deleteJob = async (req, res) => { // 'export' hona chahiye
+    try {
+        const job = await Job.findByIdAndDelete(req.params.id);
+        if (!job) return res.status(404).json({ message: "Job not found" });
+        res.status(200).json({ message: "Deleted" });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
