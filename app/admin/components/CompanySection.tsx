@@ -10,7 +10,7 @@ const ReactQuill = dynamic(() => import("react-quill-new"), {
   loading: () => <div className="h-80 bg-gray-50 animate-pulse rounded-2xl" />,
 });
 
-const categories = [
+const categories = [ 
   "The Company",
   // "Vision & Mission",
   // "Chairman Message",
